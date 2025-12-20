@@ -465,6 +465,7 @@ export default function PrintPickingList({
       </PrintContainer>
     );
   });
+  ComponentToPrint.displayName = 'ComponentToPrint';
 
   // 배송 QR 코드 프린트 컴포넌트
   const ShippingComponentToPrint = React.forwardRef<HTMLDivElement>(
@@ -637,6 +638,7 @@ export default function PrintPickingList({
       );
     },
   );
+  ShippingComponentToPrint.displayName = 'ShippingComponentToPrint';
 
   return (
     <Box>
