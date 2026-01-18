@@ -25,6 +25,7 @@
     "axios": "^1.6.1",
     "dayjs": "^1.11.13",
     "file-saver": "^2.0.5",
+    "html5-qrcode": "^2.3.8",
     "json2csv": "^6.0.0-alpha.2",
     "next": "14.1.0",
     "plotly.js": "^2.30.1",

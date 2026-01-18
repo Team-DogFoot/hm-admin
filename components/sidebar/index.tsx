@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import IconButton from '@mui/material/IconButton';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 const QrScanner = dynamic(() => import('react-qr-scanner'), { ssr: false });
+const BarcodeScanner = dynamic(() => import('@/components/BarcodeScanner'), { ssr: false });
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -872,23 +873,17 @@ function Sidebar() {
                     앨범 바코드를 카메라에 비춰주세요
                   </Typography>
                   <Box sx={{ width: '100%', borderRadius: 2, overflow: 'hidden' }}>
-                    <QrScanner
-                      delay={300}
-                      onError={(err: Error) => {
+                    <BarcodeScanner
+                      onScan={(result: string) => {
+                        if (receiptStep === 'scanning') {
+                          handleReceiptScan(result);
+                        }
+                      }}
+                      onError={(err: string) => {
                         console.error('바코드 스캔 오류:', err);
-                        if (err.name === 'OverconstrainedError') {
-                          showSnackbar('후면 카메라를 사용할 수 없습니다', 'warning');
-                        }
+                        showSnackbar(err, 'warning');
                       }}
-                      onScan={(data: { text: string } | null) => {
-                        if (data?.text && receiptStep === 'scanning') {
-                          handleReceiptScan(data.text);
-                        }
-                      }}
-                      style={{ width: '100%' }}
-                      constraints={{
-                        video: { facingMode: 'environment' },
-                      }}
+                      height="300px"
                     />
                   </Box>
                 </Box>
