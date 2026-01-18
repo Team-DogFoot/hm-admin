@@ -55,6 +55,8 @@ export interface CreateAlbumRequest {
   deadlineForArrivalDate: string;
   eventStatus: string;
   eventPurchaseType: string;
+  // 썸네일 이미지 URL 목록
+  thumbnailImageUrls?: string[];
 }
 
 export interface UpdateAlbumRequest {

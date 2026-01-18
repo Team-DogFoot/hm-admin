@@ -12,6 +12,7 @@ import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useSnackbar } from '../../_components/useSnackbar';
+import ImageUploader from '@/components/ImageUploader';
 
 export default function CreateAlbumPage() {
   const router = useRouter();
@@ -51,6 +52,8 @@ export default function CreateAlbumPage() {
     eventStatus: 'AVAILABLE_FOR_PURCHASE',
     eventPurchaseType: 'ONLY_ALBUM',
   });
+
+  const [thumbnailImages, setThumbnailImages] = useState<string[]>([]);
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -97,6 +100,7 @@ export default function CreateAlbumPage() {
         limitPeriodDate: formData.limitPeriodDate
           ? Number(formData.limitPeriodDate)
           : undefined,
+        thumbnailImageUrls: thumbnailImages,
       });
       showSnackbar('앨범과 디폴트 행사가 등록되었습니다.', 'success');
       setTimeout(() => router.push('/album-purchase/albums'), 1500);
@@ -260,6 +264,14 @@ export default function CreateAlbumPage() {
               rows={2}
               value={formData.memo}
               onChange={(e) => handleChange('memo', e.target.value)}
+            />
+
+            {/* 썸네일 이미지 업로드 */}
+            <ImageUploader
+              images={thumbnailImages}
+              onImagesChange={setThumbnailImages}
+              maxImages={5}
+              purpose="thumbnail"
             />
           </Stack>
         </Paper>
