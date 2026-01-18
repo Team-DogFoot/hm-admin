@@ -149,7 +149,7 @@ export default function AlbumsTable({ onSuccess, onError }: AlbumsTableProps) {
       flex: 1,
       minWidth: 200,
       renderCell: (params) => (
-        <Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 1 }}>
           <Typography variant="body2" fontWeight={500} noWrap>
             {params.value}
           </Typography>
