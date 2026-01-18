@@ -11,6 +11,10 @@ import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
 import CircularProgress from '@mui/material/CircularProgress';
+import Tooltip from '@mui/material/Tooltip';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useSnackbar } from '../../_components/useSnackbar';
 import ImageUploader from '@/components/ImageUploader';
 
@@ -230,23 +234,91 @@ export default function CreateAlbumPage() {
             >
               <TextField
                 fullWidth
-                label="Soft Purchase Limit"
+                label="Soft Limit (즉시 매입 수량)"
                 type="number"
                 required
                 value={formData.softPurchaseLimit}
                 onChange={(e) =>
                   handleChange('softPurchaseLimit', e.target.value)
                 }
+                helperText="이 수량까지는 협의 없이 즉시 매입 가능"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip
+                        title={
+                          <Box sx={{ p: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                              Soft Limit (즉시 매입 한도)
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                              고객이 신청한 수량이 이 값 이하면 <strong>&quot;매입 가능&quot;</strong> 상태로 처리됩니다.
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#4caf50' }}>
+                              예: Soft=100 설정 시, 1~100개 신청은 즉시 승인
+                            </Typography>
+                          </Box>
+                        }
+                        arrow
+                        placement="top"
+                      >
+                        <IconButton size="small" sx={{ color: 'action.active' }}>
+                          <HelpOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
               />
               <TextField
                 fullWidth
-                label="Hard Purchase Limit"
+                label="Hard Limit (최대 매입 수량)"
                 type="number"
                 required
                 value={formData.hardPurchaseLimit}
                 onChange={(e) =>
                   handleChange('hardPurchaseLimit', e.target.value)
                 }
+                helperText="이 수량 초과 시 매입 불가"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip
+                        title={
+                          <Box sx={{ p: 1 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                              Hard Limit (최대 매입 한도)
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                              • Soft ~ Hard 사이: <strong>&quot;협의 필요&quot;</strong> 상태
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                              • Hard 초과: <strong>&quot;매입 불가&quot;</strong> 상태
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#ff9800', mt: 1 }}>
+                              예: Soft=100, Hard=200 설정 시
+                            </Typography>
+                            <Typography variant="body2" sx={{ pl: 1 }}>
+                              - 1~100개: 즉시 승인
+                            </Typography>
+                            <Typography variant="body2" sx={{ pl: 1 }}>
+                              - 101~200개: 협의 필요
+                            </Typography>
+                            <Typography variant="body2" sx={{ pl: 1, color: '#f44336' }}>
+                              - 201개~: 매입 불가
+                            </Typography>
+                          </Box>
+                        }
+                        arrow
+                        placement="top"
+                      >
+                        <IconButton size="small" sx={{ color: 'action.active' }}>
+                          <HelpOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Box>
             <TextField

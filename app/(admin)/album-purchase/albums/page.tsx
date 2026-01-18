@@ -6,9 +6,11 @@ import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import Tooltip from '@mui/material/Tooltip';
 import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import {
   useGetAlbums,
   useDeleteAlbum,
@@ -87,14 +89,38 @@ function AlbumsTable({
     {
       field: 'softPurchaseLimit',
       headerName: 'Soft Limit',
-      width: 110,
+      width: 130,
       type: 'number',
+      renderHeader: () => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <span>Soft Limit</span>
+          <Tooltip
+            title="즉시 매입 가능 수량. 이 수량 이하 신청은 '매입 가능' 상태로 처리"
+            arrow
+            placement="top"
+          >
+            <HelpOutlineIcon sx={{ fontSize: 16, color: 'action.active', cursor: 'help' }} />
+          </Tooltip>
+        </Box>
+      ),
     },
     {
       field: 'hardPurchaseLimit',
       headerName: 'Hard Limit',
-      width: 110,
+      width: 130,
       type: 'number',
+      renderHeader: () => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <span>Hard Limit</span>
+          <Tooltip
+            title="최대 매입 한도. Soft~Hard 사이는 '협의 필요', Hard 초과는 '매입 불가'"
+            arrow
+            placement="top"
+          >
+            <HelpOutlineIcon sx={{ fontSize: 16, color: 'action.active', cursor: 'help' }} />
+          </Tooltip>
+        </Box>
+      ),
     },
     {
       field: 'isVisible',
