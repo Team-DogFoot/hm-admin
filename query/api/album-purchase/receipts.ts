@@ -1,6 +1,10 @@
 import { API_URL } from '@/constants/apis';
 import { requests } from '../../request';
 import type {
+  QuickScanRequest,
+  QuickScanResponse,
+  UpdateReceiptRequest,
+  UpdateVideoRequest,
   ScanReceiptRequest,
   ScanReceiptResponse,
   UnmatchedReceiptDetail,
@@ -13,7 +17,118 @@ import type {
 
 const BASE_URL = `${API_URL}/logi/album-purchase/admin/receipt`;
 
-// 송장 스캔
+// 퀵스캔 - 송장번호만으로 수령 건 생성
+export const quickScanReceipt = async (
+  requestData: QuickScanRequest,
+): Promise<QuickScanResponse> => {
+  const { data } = await requests({
+    method: 'post',
+    url: `${BASE_URL}/quick-scan`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    alert(`${errorMessage}\n${errorCode}\n${customMessage}`);
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    alert(`${errorMessage}\n${errorCode}`);
+    throw new Error(errorMessage);
+  }
+
+  return data as QuickScanResponse;
+};
+
+// 수령 건 상세 조회
+export const getReceiptDetail = async (
+  receiptId: number,
+): Promise<UnmatchedReceiptDetail> => {
+  const { data } = await requests({
+    method: 'get',
+    url: `${BASE_URL}/${receiptId}`,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    alert(`${errorMessage}\n${errorCode}\n${customMessage}`);
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    alert(`${errorMessage}\n${errorCode}`);
+    throw new Error(errorMessage);
+  }
+
+  return data as UnmatchedReceiptDetail;
+};
+
+// 수령 건 상세 정보 수정
+export const updateReceipt = async (
+  receiptId: number,
+  requestData: UpdateReceiptRequest,
+): Promise<UnmatchedReceiptDetail> => {
+  const { data } = await requests({
+    method: 'put',
+    url: `${BASE_URL}/${receiptId}`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    alert(`${errorMessage}\n${errorCode}\n${customMessage}`);
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    alert(`${errorMessage}\n${errorCode}`);
+    throw new Error(errorMessage);
+  }
+
+  return data as UnmatchedReceiptDetail;
+};
+
+// 수령 건 영상 URL 업데이트
+export const updateReceiptVideoUrl = async (
+  receiptId: number,
+  requestData: UpdateVideoRequest,
+): Promise<UnmatchedReceiptDetail> => {
+  const { data } = await requests({
+    method: 'put',
+    url: `${BASE_URL}/${receiptId}/video`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    alert(`${errorMessage}\n${errorCode}\n${customMessage}`);
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    alert(`${errorMessage}\n${errorCode}`);
+    throw new Error(errorMessage);
+  }
+
+  return data as UnmatchedReceiptDetail;
+};
+
+// 수령 건 삭제
+export const deleteReceipt = async (receiptId: number): Promise<void> => {
+  const { data } = await requests({
+    method: 'delete',
+    url: `${BASE_URL}/${receiptId}`,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    alert(`${errorMessage}\n${errorCode}\n${customMessage}`);
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    alert(`${errorMessage}\n${errorCode}`);
+    throw new Error(errorMessage);
+  }
+};
+
+// 송장 스캔 (기존 - 전체 정보 포함)
 export const scanReceipt = async (
   requestData: ScanReceiptRequest,
 ): Promise<ScanReceiptResponse> => {
@@ -151,4 +266,31 @@ export const searchRequests = async (
   }
 
   return data as AlbumPurchaseRequestSimple[];
+};
+
+// 영상 업로드용 Presigned URL 생성
+export const createReceiptPresignedUrl = async (
+  receiptId: number,
+  fileName: string,
+  fileType: string,
+): Promise<{ presignedUrl: string; uploadFileUrl: string; receiptId: string }> => {
+  const { data } = await requests({
+    method: 'post',
+    url: `${BASE_URL}/video/presign`,
+    data: {
+      receiptId: receiptId.toString(),
+      fileName,
+      fileType,
+    },
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data;
 };

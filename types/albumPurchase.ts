@@ -198,6 +198,33 @@ export interface TrackingNumberInfo {
 }
 
 // Receipt DTOs
+export interface QuickScanRequest {
+  trackingNumber: string;
+}
+
+export interface QuickScanResponse {
+  receiptId: number;
+  trackingNumber: string;
+  message: string;
+}
+
+export interface UpdateReceiptRequest {
+  shippingCompany?: string;
+  receivedBy?: string;
+  senderName?: string;
+  deliveryDestination?: string;
+  arrivedQuantity?: number;
+  normalPurchaseCount?: number;
+  damagedCount?: number;
+  hasSignedAlbum?: boolean;
+  hasUnreleasedPhotocard?: boolean;
+  memo?: string;
+}
+
+export interface UpdateVideoRequest {
+  videoUrl: string;
+}
+
 export interface ScanReceiptRequest {
   trackingNumber: string;
   shippingCompany: string;
@@ -217,9 +244,17 @@ export interface ScanReceiptResponse {
 export interface UnmatchedReceiptDetail {
   id: number;
   trackingNumber: string;
-  shippingCompany: string;
+  shippingCompany?: string;
   receivedAt: string;
-  receivedBy: string;
+  receivedBy?: string;
+  senderName?: string;
+  deliveryDestination?: string;
+  arrivedQuantity?: number;
+  normalPurchaseCount?: number;
+  damagedCount?: number;
+  hasSignedAlbum?: boolean;
+  hasUnreleasedPhotocard?: boolean;
+  videoUrl?: string;
   isMatched: boolean;
   matchedRequestId?: number;
   matchedAt?: string;

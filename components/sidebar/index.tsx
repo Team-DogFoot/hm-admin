@@ -26,9 +26,12 @@ import Box from '@mui/material/Box';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useSnackbar } from '@/providers/SnackbarProvider';
 import { registerRes, presignRes, uploadRes } from '@/query/api/shipping';
+import { useRouter } from 'next/navigation';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 function Sidebar() {
   const { showSnackbar } = useSnackbar();
+  const router = useRouter();
   const { userEmail } = useAuth();
   const [openMenus, setOpenMenus] = React.useState<{ [key: string]: boolean }>(
     {},
@@ -387,7 +390,16 @@ function Sidebar() {
         {renderMenus(visibleMenus)}
         {showPocaMenus && renderMenus(pocaMenus)}
       </List>
-      <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 2 }}>
+      <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Button
+          variant="contained"
+          color="secondary"
+          fullWidth
+          onClick={() => router.push('/album-purchase/mobile-receipt')}
+          startIcon={<LocalShippingIcon />}
+        >
+          수령처리
+        </Button>
         <Button
           variant="contained"
           color="primary"
