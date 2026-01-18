@@ -372,6 +372,8 @@ export default function AlbumsTable({ onSuccess, onError }: AlbumsTableProps) {
             },
             '& .MuiDataGrid-cell': {
               borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
             },
             '& .MuiDataGrid-row:hover': {
               bgcolor: 'action.hover',
