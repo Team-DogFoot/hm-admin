@@ -14,14 +14,21 @@ export default function SignUp() {
     formState: { errors },
   } = useForm<SignUp>({ mode: 'onChange' });
 
-  const onSubmit: SubmitHandler<SignUp> = (data) => {
-    signUp(data).then((data) => {
-      if (data && data.errorMessage) {
-        alert(data.errorMessage);
+  const onSubmit: SubmitHandler<SignUp> = async (data) => {
+    try {
+      const result = await signUp(data);
+      if (result && result.errorMessage) {
+        alert(result.errorMessage);
       } else {
         window.location.href = '/';
       }
-    });
+    } catch (error: any) {
+      if (error?.response?.status === 409) {
+        alert('이미 등록된 이메일입니다.');
+      } else {
+        alert(error?.response?.data?.message || '회원가입에 실패했습니다.');
+      }
+    }
   };
 
   useIsAdmin();
