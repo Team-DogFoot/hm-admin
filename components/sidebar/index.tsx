@@ -28,6 +28,18 @@ import { useSnackbar } from '@/providers/SnackbarProvider';
 import { registerRes, presignRes, uploadRes } from '@/query/api/shipping';
 import { useRouter } from 'next/navigation';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import StopIcon from '@mui/icons-material/Stop';
+import CloseIcon from '@mui/icons-material/Close';
+import axios from 'axios';
+import {
+  quickScanReceipt,
+  updateReceiptVideoUrl,
+  createReceiptPresignedUrl,
+} from '@/query/api/album-purchase/receipts';
 
 function Sidebar() {
   const { showSnackbar } = useSnackbar();
@@ -53,6 +65,21 @@ function Sidebar() {
     'inactive' | 'recording' | 'paused'
   >('inactive');
   const chunksRef = React.useRef<Blob[]>([]);
+
+  // Receipt modal state
+  const [openReceiptModal, setOpenReceiptModal] = React.useState(false);
+  const [receiptStep, setReceiptStep] = React.useState<
+    'scanning' | 'processing' | 'ask-video' | 'recording' | 'uploading' | 'complete'
+  >('scanning');
+  const [scannedReceipt, setScannedReceipt] = React.useState<{
+    id: number;
+    barcode: string;
+  } | null>(null);
+  const [receiptVideoBlob, setReceiptVideoBlob] = React.useState<Blob | null>(null);
+  const receiptVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const receiptMediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const receiptChunksRef = React.useRef<Blob[]>([]);
+  const [receiptIsRecording, setReceiptIsRecording] = React.useState(false);
 
   // 디바이스 기능 감지
   React.useEffect(() => {
@@ -270,6 +297,142 @@ function Sidebar() {
     setOpenMenus((prev) => ({ ...prev, [text]: !prev[text] }));
   };
 
+  // Receipt modal handlers
+  const handleReceiptScan = async (barcode: string) => {
+    setReceiptStep('processing');
+    try {
+      const result = await quickScanReceipt({ trackingNumber: barcode });
+      setScannedReceipt({
+        id: result.receiptId,
+        barcode: result.trackingNumber,
+      });
+      setReceiptStep('ask-video');
+      showSnackbar(`수령 처리 완료: ${result.trackingNumber}`, 'success');
+    } catch (error: any) {
+      console.error('Quick scan error:', error);
+      showSnackbar(error?.message || '수령 처리 중 오류가 발생했습니다', 'error');
+      setReceiptStep('scanning');
+    }
+  };
+
+  const startReceiptRecording = async () => {
+    try {
+      const constraints = {
+        video: {
+          facingMode: { exact: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+      }
+
+      if (receiptVideoRef.current) {
+        receiptVideoRef.current.srcObject = stream;
+        receiptVideoRef.current.play();
+        receiptVideoRef.current.setAttribute('playsinline', 'true');
+        receiptVideoRef.current.setAttribute('webkit-playsinline', 'true');
+      }
+
+      const mimeType = getSupportedMimeType();
+      receiptChunksRef.current = [];
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      receiptMediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          receiptChunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(receiptChunksRef.current, { type: mimeType });
+        setReceiptVideoBlob(blob);
+        stream.getTracks().forEach((track) => track.stop());
+        setReceiptIsRecording(false);
+        const fileSizeInMB = (blob.size / (1024 * 1024)).toFixed(2);
+        showSnackbar(`촬영 완료: ${fileSizeInMB}MB`, 'success');
+      };
+
+      mediaRecorder.start(1000);
+      setReceiptIsRecording(true);
+      setReceiptStep('recording');
+      showSnackbar('녹화가 시작되었습니다', 'info');
+    } catch (error) {
+      console.error('Receipt recording error:', error);
+      showSnackbar('카메라에 접근할 수 없습니다', 'error');
+    }
+  };
+
+  const stopReceiptRecording = () => {
+    if (receiptMediaRecorderRef.current && receiptMediaRecorderRef.current.state !== 'inactive') {
+      receiptMediaRecorderRef.current.stop();
+    }
+  };
+
+  const uploadReceiptVideo = async () => {
+    if (!receiptVideoBlob || !scannedReceipt) {
+      showSnackbar('업로드할 비디오가 없습니다', 'error');
+      return;
+    }
+
+    setReceiptStep('uploading');
+    try {
+      const fileSizeInMB = (receiptVideoBlob.size / (1024 * 1024)).toFixed(2);
+      showSnackbar(`${fileSizeInMB}MB 비디오 업로드 중...`, 'info');
+
+      const fileName = `receipt_${scannedReceipt.id}_${Date.now()}.webm`;
+      const fileType = receiptVideoBlob.type || 'video/webm';
+      const presignedData = await createReceiptPresignedUrl(scannedReceipt.id, fileName, fileType);
+
+      await axios.put(presignedData.presignedUrl, receiptVideoBlob, {
+        headers: { 'Content-Type': fileType },
+      });
+
+      await updateReceiptVideoUrl(scannedReceipt.id, { videoUrl: presignedData.uploadFileUrl });
+
+      setReceiptStep('complete');
+      showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
+
+      setTimeout(() => {
+        resetReceiptModal();
+      }, 1500);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      showSnackbar(error?.message || '업로드 중 오류가 발생했습니다', 'error');
+      setReceiptStep('ask-video');
+    }
+  };
+
+  const resetReceiptModal = () => {
+    setReceiptStep('scanning');
+    setScannedReceipt(null);
+    setReceiptVideoBlob(null);
+    setReceiptIsRecording(false);
+    receiptChunksRef.current = [];
+  };
+
+  const closeReceiptModal = () => {
+    if (receiptMediaRecorderRef.current && receiptIsRecording) {
+      receiptMediaRecorderRef.current.stop();
+    }
+    setOpenReceiptModal(false);
+    resetReceiptModal();
+  };
+
+  const skipReceiptVideo = () => {
+    showSnackbar('영상 촬영을 건너뛰었습니다', 'info');
+    resetReceiptModal();
+  };
+
   const showPocaMenus =
     userEmail === 'rudghksldl@gmail.com' || userEmail === 'kurare@naver.com';
   const showAuditMenus = ['rudghksldl', 'kurare', 'kkhdevs'].some((keyword) =>
@@ -395,7 +558,7 @@ function Sidebar() {
           variant="contained"
           color="secondary"
           fullWidth
-          onClick={() => router.push('/album-purchase/mobile-receipt')}
+          onClick={() => setOpenReceiptModal(true)}
           startIcon={<LocalShippingIcon />}
         >
           수령처리
@@ -637,6 +800,301 @@ function Sidebar() {
           <DialogActions>
             <Button onClick={() => setOpenQrScanner(false)}>닫기</Button>
           </DialogActions>
+        </Dialog>
+
+        {/* Receipt Processing Modal */}
+        <Dialog
+          open={openReceiptModal}
+          onClose={closeReceiptModal}
+          fullScreen
+          PaperProps={{
+            sx: {
+              background: theme.palette.background.default,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              width: '100%',
+            }}
+          >
+            {/* Header */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                p: 2,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                backgroundColor: theme.palette.background.paper,
+              }}
+            >
+              <Typography variant="h6" fontWeight="bold">
+                수령 처리
+              </Typography>
+              <IconButton onClick={closeReceiptModal} size="large">
+                <CloseIcon />
+              </IconButton>
+            </Box>
+
+            {/* Content */}
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 3,
+                overflow: 'auto',
+              }}
+            >
+              {/* Step: Scanning */}
+              {receiptStep === 'scanning' && (
+                <Box
+                  sx={{
+                    width: '100%',
+                    maxWidth: 400,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                >
+                  <QrCodeScannerIcon sx={{ fontSize: 80, color: theme.palette.primary.main }} />
+                  <Typography variant="h5" textAlign="center" fontWeight="bold">
+                    바코드를 스캔하세요
+                  </Typography>
+                  <Typography variant="body1" textAlign="center" color="text.secondary">
+                    앨범 바코드를 카메라에 비춰주세요
+                  </Typography>
+                  <Box sx={{ width: '100%', borderRadius: 2, overflow: 'hidden' }}>
+                    <QrScanner
+                      delay={300}
+                      onError={(err: Error) => {
+                        console.error('바코드 스캔 오류:', err);
+                        if (err.name === 'OverconstrainedError') {
+                          showSnackbar('후면 카메라를 사용할 수 없습니다', 'warning');
+                        }
+                      }}
+                      onScan={(data: { text: string } | null) => {
+                        if (data?.text && receiptStep === 'scanning') {
+                          handleReceiptScan(data.text);
+                        }
+                      }}
+                      style={{ width: '100%' }}
+                      constraints={{
+                        video: { facingMode: 'environment' },
+                      }}
+                    />
+                  </Box>
+                </Box>
+              )}
+
+              {/* Step: Processing */}
+              {receiptStep === 'processing' && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                >
+                  <CircularProgress size={80} />
+                  <Typography variant="h5" textAlign="center" fontWeight="bold">
+                    수령 처리 중...
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Step: Ask Video */}
+              {receiptStep === 'ask-video' && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                    width: '100%',
+                    maxWidth: 400,
+                  }}
+                >
+                  <CheckCircleIcon sx={{ fontSize: 80, color: theme.palette.success.main }} />
+                  <Typography variant="h5" textAlign="center" fontWeight="bold">
+                    수령 완료!
+                  </Typography>
+                  {scannedReceipt?.barcode && (
+                    <Typography variant="body1" textAlign="center" color="text.secondary">
+                      송장번호: {scannedReceipt.barcode}
+                    </Typography>
+                  )}
+                  <Typography variant="h6" textAlign="center" sx={{ mt: 2 }}>
+                    영상을 촬영하시겠습니까?
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, width: '100%', mt: 2 }}>
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      fullWidth
+                      size="large"
+                      onClick={skipReceiptVideo}
+                      sx={{ py: 2, borderRadius: 2 }}
+                    >
+                      건너뛰기
+                    </Button>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      fullWidth
+                      size="large"
+                      onClick={startReceiptRecording}
+                      startIcon={<VideocamIcon />}
+                      sx={{ py: 2, borderRadius: 2 }}
+                    >
+                      촬영하기
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Step: Recording */}
+              {receiptStep === 'recording' && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 2,
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      color: receiptIsRecording ? theme.palette.error.main : theme.palette.text.primary,
+                    }}
+                  >
+                    {receiptIsRecording && (
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          backgroundColor: theme.palette.error.main,
+                          animation: 'pulse 1s infinite',
+                          '@keyframes pulse': {
+                            '0%': { opacity: 1 },
+                            '50%': { opacity: 0.5 },
+                            '100%': { opacity: 1 },
+                          },
+                        }}
+                      />
+                    )}
+                    <Typography variant="h6" fontWeight="bold">
+                      {receiptIsRecording ? '녹화 중...' : '녹화 준비'}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      width: '100%',
+                      backgroundColor: '#000',
+                      borderRadius: 2,
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <video
+                      ref={receiptVideoRef}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                      }}
+                      muted
+                      playsInline
+                      webkit-playsinline="true"
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 2, width: '100%', maxWidth: 400 }}>
+                    {receiptIsRecording ? (
+                      <Button
+                        variant="contained"
+                        color="error"
+                        fullWidth
+                        size="large"
+                        onClick={stopReceiptRecording}
+                        startIcon={<StopIcon />}
+                        sx={{ py: 2, borderRadius: 2 }}
+                      >
+                        촬영 종료
+                      </Button>
+                    ) : receiptVideoBlob ? (
+                      <Button
+                        variant="contained"
+                        color="success"
+                        fullWidth
+                        size="large"
+                        onClick={uploadReceiptVideo}
+                        sx={{ py: 2, borderRadius: 2 }}
+                      >
+                        업로드
+                      </Button>
+                    ) : null}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Step: Uploading */}
+              {receiptStep === 'uploading' && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                >
+                  <CircularProgress size={80} />
+                  <Typography variant="h5" textAlign="center" fontWeight="bold">
+                    업로드 중...
+                  </Typography>
+                  <Typography variant="body1" textAlign="center" color="text.secondary">
+                    잠시만 기다려주세요
+                  </Typography>
+                </Box>
+              )}
+
+              {/* Step: Complete */}
+              {receiptStep === 'complete' && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}
+                >
+                  <CheckCircleIcon sx={{ fontSize: 100, color: theme.palette.success.main }} />
+                  <Typography variant="h4" textAlign="center" fontWeight="bold">
+                    완료!
+                  </Typography>
+                  <Typography variant="body1" textAlign="center" color="text.secondary">
+                    다음 앨범 스캔을 준비합니다...
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
         </Dialog>
       </Box>
     </Drawer>
