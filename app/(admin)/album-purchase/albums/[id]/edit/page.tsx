@@ -15,6 +15,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import IconButton from '@mui/material/IconButton';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { useSnackbar } from '../../../_components/useSnackbar';
+import ImageUploader from '@/components/ImageUploader';
 
 export default function EditAlbumPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -39,6 +40,8 @@ export default function EditAlbumPage({ params }: { params: { id: string } }) {
     hardPurchaseLimit: '',
   });
 
+  const [thumbnailImages, setThumbnailImages] = useState<string[]>([]);
+
   useEffect(() => {
     if (albums) {
       const album = albums.find((a: any) => a.id === id);
@@ -57,6 +60,10 @@ export default function EditAlbumPage({ params }: { params: { id: string } }) {
           softPurchaseLimit: String(album.softPurchaseLimit || 0),
           hardPurchaseLimit: String(album.hardPurchaseLimit || 0),
         });
+        // 기존 썸네일 이미지 로드
+        if (album.thumbnailImageUrls) {
+          setThumbnailImages(album.thumbnailImageUrls);
+        }
       }
     }
   }, [albums, id]);
@@ -78,6 +85,7 @@ export default function EditAlbumPage({ params }: { params: { id: string } }) {
         entertainmentAgency: formData.entertainmentAgency,
         albumDescription: formData.albumDescription,
         memo: formData.memo,
+        thumbnailImageUrls: thumbnailImages,
       });
       showSnackbar('앨범 정보가 수정되었습니다.', 'success');
       setTimeout(() => router.push('/album-purchase/albums'), 1500);
@@ -320,6 +328,14 @@ export default function EditAlbumPage({ params }: { params: { id: string } }) {
               rows={2}
               value={formData.memo}
               onChange={(e) => handleChange('memo', e.target.value)}
+            />
+
+            {/* 썸네일 이미지 업로드 */}
+            <ImageUploader
+              images={thumbnailImages}
+              onImagesChange={setThumbnailImages}
+              maxImages={5}
+              purpose="thumbnail"
             />
           </Stack>
         </Paper>

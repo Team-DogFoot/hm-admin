@@ -22,6 +22,8 @@ export interface AlbumPurchase {
   albumDescription?: string;
   createdAt: string;
   updatedAt: string;
+  // 썸네일 이미지 URL 목록
+  thumbnailImageUrls?: string[];
 }
 
 export interface CreateAlbumRequest {
@@ -68,6 +70,8 @@ export interface UpdateAlbumRequest {
   entertainmentAgency?: string;
   albumDescription?: string;
   memo?: string;
+  // 썸네일 이미지 URL 목록
+  thumbnailImageUrls?: string[];
 }
 
 // 앨범 목록 조회
