@@ -1,17 +1,28 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
-import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
+import Alert from '@mui/material/Alert';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import SearchIcon from '@mui/icons-material/Search';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import AddIcon from '@mui/icons-material/Add';
 import {
   useGetSettlements,
   useGetEligibleRequests,
@@ -19,6 +30,9 @@ import {
 } from '@/query/query/album-purchase/settlements';
 import type { SettlementStatus } from '@/types/albumPurchase';
 import { useSnackbar } from '../_components/useSnackbar';
+import ListPageHeader from '../_components/ListPageHeader';
+import StatCard from '../_components/StatCard';
+import { dataGridStyles, dataGridLocaleText } from '../_components/dataGridStyles';
 
 const statusLabels: Record<SettlementStatus, string> = {
   PENDING: '정산대기',
@@ -28,6 +42,23 @@ const statusLabels: Record<SettlementStatus, string> = {
   HOLD: '정산보류',
 };
 
+const getStatusColor = (status: SettlementStatus) => {
+  switch (status) {
+    case 'COMPLETED':
+      return 'success';
+    case 'IN_PROGRESS':
+      return 'info';
+    case 'PENDING':
+      return 'warning';
+    case 'CANCELLED':
+      return 'error';
+    case 'HOLD':
+      return 'default';
+    default:
+      return 'default';
+  }
+};
+
 function EligibleRequestsTable({
   selectedRequestIds,
   onSelectionChange,
@@ -35,52 +66,51 @@ function EligibleRequestsTable({
   selectedRequestIds: number[];
   onSelectionChange: (ids: number[]) => void;
 }) {
-  const { data: eligibleRequests } = useGetEligibleRequests();
+  const { data: eligibleRequests, isLoading } = useGetEligibleRequests();
 
   const columns: GridColDef[] = [
-    {
-      field: 'requestId',
-      headerName: '신청 ID',
-      width: 90,
-    },
+    { field: 'requestId', headerName: '신청 ID', width: 90, headerAlign: 'center', align: 'center' },
     {
       field: 'userName',
       headerName: '신청자',
-      width: 100,
-    },
-    {
-      field: 'userEmail',
-      headerName: '이메일',
-      flex: 1,
-      minWidth: 180,
+      width: 120,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 1 }}>
+          <Typography variant="body2" fontWeight={500}>
+            {params.value}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {params.row.userEmail}
+          </Typography>
+        </Box>
+      ),
     },
     {
       field: 'totalEvaluatedPrice',
       headerName: '평가 금액',
-      width: 130,
-      type: 'number',
-      renderCell: (params: any) => {
-        return `₩${params.value?.toLocaleString() || '0'}`;
-      },
+      width: 120,
+      headerAlign: 'right',
+      align: 'right',
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight={500}>
+          {params.value?.toLocaleString() || 0}원
+        </Typography>
+      ),
     },
     {
       field: 'finishReviewAt',
       headerName: '검수 완료일',
-      width: 130,
-      renderCell: (params: any) => {
-        return new Date(params.value).toLocaleDateString();
-      },
+      width: 110,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Typography variant="body2" color="text.secondary">
+          {params.value ? new Date(params.value).toLocaleDateString() : '-'}
+        </Typography>
+      ),
     },
-    {
-      field: 'bankName',
-      headerName: '은행',
-      width: 100,
-    },
-    {
-      field: 'bankAccountNumber',
-      headerName: '계좌번호',
-      width: 150,
-    },
+    { field: 'bankName', headerName: '은행', width: 100 },
+    { field: 'bankAccountNumber', headerName: '계좌번호', width: 150 },
   ];
 
   const rows = (eligibleRequests || []).map((request: any) => ({
@@ -96,130 +126,53 @@ function EligibleRequestsTable({
 
   return (
     <DataGrid
-      sx={{ height: 'auto', background: 'white', fontSize: 14 }}
       rows={rows}
       columns={columns}
-      pageSizeOptions={[20, 50, 100]}
-      initialState={{
-        pagination: {
-          paginationModel: { page: 0, pageSize: 20 },
-        },
-      }}
+      pageSizeOptions={[10, 20, 50]}
+      initialState={{ pagination: { paginationModel: { page: 0, pageSize: 10 } } }}
+      loading={isLoading}
       checkboxSelection
       rowSelectionModel={selectedRequestIds as any}
       onRowSelectionModelChange={(newSelection: any) => {
         onSelectionChange(Array.from(newSelection) as number[]);
       }}
       disableRowSelectionOnClick
-    />
-  );
-}
-
-function SettlementsTable({
-  statusFilter,
-}: {
-  statusFilter?: SettlementStatus;
-}) {
-  const { data: settlements, isLoading } = useGetSettlements({
-    status: statusFilter,
-  });
-  const router = useRouter();
-
-  const columns: GridColDef[] = [
-    {
-      field: 'id',
-      headerName: '정산 ID',
-      width: 90,
-    },
-    {
-      field: 'userName',
-      headerName: '신청자',
-      width: 100,
-    },
-    {
-      field: 'userEmail',
-      headerName: '이메일',
-      flex: 1,
-      minWidth: 180,
-    },
-    {
-      field: 'finalAmount',
-      headerName: '정산 금액',
-      width: 130,
-      type: 'number',
-      renderCell: (params: any) => {
-        return `₩${params.value?.toLocaleString() || '0'}`;
-      },
-    },
-    {
-      field: 'settlementDate',
-      headerName: '정산일',
-      width: 120,
-    },
-    {
-      field: 'status',
-      headerName: '상태',
-      width: 120,
-      renderCell: (params: any) => {
-        const status = params.value as SettlementStatus;
-        const color = status === 'COMPLETED' ? 'success' : 'default';
-        return <Chip label={statusLabels[status]} color={color} size="small" />;
-      },
-    },
-    {
-      field: 'actions',
-      headerName: '작업',
-      type: 'actions',
-      width: 80,
-      getActions: (params: any) => [
-        <GridActionsCellItem
-          key="view"
-          icon={<VisibilityIcon />}
-          label="상세"
-          onClick={() =>
-            router.push(`/album-purchase/settlements/${params.id}`)
-          }
-        />,
-      ],
-    },
-  ];
-
-  const rows = (settlements || []).map((settlement: any) => ({
-    id: settlement.id,
-    userName: settlement.userName,
-    userEmail: settlement.userEmail,
-    finalAmount: settlement.finalAmount,
-    settlementDate: settlement.settlementDate,
-    status: settlement.status,
-  }));
-
-  return (
-    <DataGrid
-      sx={{ height: 'auto', background: 'white', fontSize: 14 }}
-      rows={rows}
-      columns={columns}
-      pageSizeOptions={[20, 50, 100]}
-      initialState={{
-        pagination: {
-          paginationModel: { page: 0, pageSize: 20 },
-        },
-      }}
-      loading={isLoading}
-      disableRowSelectionOnClick
+      rowHeight={60}
+      sx={dataGridStyles}
+      localeText={{ ...dataGridLocaleText, noRowsLabel: '정산 대상이 없습니다' }}
     />
   );
 }
 
 export default function SettlementsPage() {
+  const router = useRouter();
   const { showSnackbar, SnackbarComponent } = useSnackbar();
-  const [statusFilter, setStatusFilter] = useState<
-    SettlementStatus | undefined
-  >();
+  const [statusFilter, setStatusFilter] = useState<SettlementStatus | undefined>();
+  const [searchText, setSearchText] = useState('');
   const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
 
-  const { data: eligibleRequests, refetch: refetchEligible } =
-    useGetEligibleRequests();
+  const { data: eligibleRequests = [], refetch: refetchEligible } = useGetEligibleRequests();
+  const { data: settlements = [], isLoading, refetch } = useGetSettlements({ status: statusFilter });
   const createMutation = useCreateSettlements();
+
+  // Filter settlements by search
+  const filteredSettlements = useMemo(() => {
+    if (!searchText) return settlements;
+    const search = searchText.toLowerCase();
+    return settlements.filter((settlement: any) =>
+      settlement.userName?.toLowerCase().includes(search) ||
+      settlement.userEmail?.toLowerCase().includes(search)
+    );
+  }, [settlements, searchText]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = settlements.length;
+    const pending = settlements.filter((s: any) => s.status === 'PENDING').length;
+    const completed = settlements.filter((s: any) => s.status === 'COMPLETED').length;
+    const eligible = eligibleRequests.length;
+    return { total, pending, completed, eligible };
+  }, [settlements, eligibleRequests]);
 
   const handleCreateSettlements = async () => {
     if (selectedRequestIds.length === 0) {
@@ -236,121 +189,192 @@ export default function SettlementsPage() {
         showSnackbar('정산이 생성되었습니다.', 'success');
         setSelectedRequestIds([]);
         refetchEligible();
+        refetch();
       } catch (error: any) {
         showSnackbar(error?.message || '정산 생성에 실패했습니다.', 'error');
       }
     }
   };
 
+  const settlementColumns: GridColDef[] = [
+    { field: 'id', headerName: '정산 ID', width: 90, headerAlign: 'center', align: 'center' },
+    {
+      field: 'userName',
+      headerName: '신청자',
+      width: 120,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 1 }}>
+          <Typography variant="body2" fontWeight={500}>
+            {params.value}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {params.row.userEmail}
+          </Typography>
+        </Box>
+      ),
+    },
+    {
+      field: 'finalAmount',
+      headerName: '정산 금액',
+      width: 130,
+      headerAlign: 'right',
+      align: 'right',
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight={600} color="primary.main">
+          {params.value?.toLocaleString() || 0}원
+        </Typography>
+      ),
+    },
+    {
+      field: 'settlementDate',
+      headerName: '정산일',
+      width: 110,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Typography variant="body2" color="text.secondary">
+          {params.value || '-'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'status',
+      headerName: '상태',
+      width: 120,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => {
+        const status = params.value as SettlementStatus;
+        return <Chip label={statusLabels[status] || status} color={getStatusColor(status)} size="small" />;
+      },
+    },
+    {
+      field: 'actions',
+      headerName: '',
+      width: 80,
+      sortable: false,
+      filterable: false,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Tooltip title="상세보기">
+          <IconButton size="small" onClick={() => router.push(`/album-purchase/settlements/${params.row.id}`)} sx={{ color: 'primary.main' }}>
+            <VisibilityIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+  ];
+
+  const settlementRows = filteredSettlements.map((settlement: any) => ({
+    id: settlement.id,
+    userName: settlement.userName,
+    userEmail: settlement.userEmail,
+    finalAmount: settlement.finalAmount,
+    settlementDate: settlement.settlementDate,
+    status: settlement.status,
+  }));
+
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: 'calc(100vh - 72px)' }}>
       <SnackbarComponent />
-      <Typography
-        variant="h6"
-        sx={{
-          background: 'white',
-          p: 2,
-          fontWeight: 500,
-          border: '1px solid',
-          borderColor: 'divider',
-          mb: 2,
-          fontSize: 18,
-        }}
-      >
-        정산 관리
-      </Typography>
+      <ListPageHeader
+        icon={<AccountBalanceWalletIcon sx={{ fontSize: 18 }} />}
+        title="정산 관리"
+        description="매입 신청의 정산을 생성하고 관리합니다"
+      />
+
+      {/* Stats Cards */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <StatCard title="정산 대기" value={stats.eligible} icon={<HourglassEmptyIcon />} color="#ed6c02" isLoading={isLoading} />
+        <StatCard title="전체 정산" value={stats.total} icon={<AccountBalanceWalletIcon />} color="#1976d2" isLoading={isLoading} />
+        <StatCard title="대기중" value={stats.pending} icon={<PendingActionsIcon />} color="#9c27b0" isLoading={isLoading} />
+        <StatCard title="정산 완료" value={stats.completed} icon={<CheckCircleIcon />} color="#2e7d32" isLoading={isLoading} />
+      </Box>
 
       {/* 정산 대상 */}
-      {eligibleRequests && eligibleRequests.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mb: 2,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontSize: 16, fontWeight: 600 }}>
-              정산 대상 ({eligibleRequests.length}건)
-            </Typography>
+      {eligibleRequests.length > 0 && (
+        <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+          <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: 'warning.50' }}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600} color="warning.dark">
+                정산 대상 ({eligibleRequests.length}건)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                검수가 완료되어 정산 대기 중인 신청입니다
+              </Typography>
+            </Box>
             <Button
               variant="contained"
               onClick={handleCreateSettlements}
-              disabled={
-                selectedRequestIds.length === 0 || createMutation.isPending
-              }
-              startIcon={
-                createMutation.isPending && (
-                  <CircularProgress size={16} color="inherit" />
-                )
-              }
-              sx={{
-                background: '#4caf50',
-                '&:hover': { background: '#45a049' },
-              }}
+              disabled={selectedRequestIds.length === 0 || createMutation.isPending}
+              startIcon={createMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
             >
-              {createMutation.isPending
-                ? '생성 중...'
-                : `정산 생성 (${selectedRequestIds.length}건)`}
+              {createMutation.isPending ? '생성 중...' : `정산 생성 (${selectedRequestIds.length}건)`}
             </Button>
           </Box>
-          <Suspense
-            fallback={
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                <CircularProgress />
-              </Box>
-            }
-          >
-            <EligibleRequestsTable
-              selectedRequestIds={selectedRequestIds}
-              onSelectionChange={setSelectedRequestIds}
-            />
-          </Suspense>
+          <Box sx={{ p: 2 }}>
+            <EligibleRequestsTable selectedRequestIds={selectedRequestIds} onSelectionChange={setSelectedRequestIds} />
+          </Box>
         </Paper>
       )}
 
       {/* 정산 목록 */}
-      <Paper sx={{ p: 2 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 2,
-          }}
-        >
-          <Typography variant="h6" sx={{ fontSize: 16, fontWeight: 600 }}>
+      <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+        {/* Search Toolbar */}
+        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Typography variant="subtitle1" fontWeight={600}>
             정산 목록
           </Typography>
+          <Box sx={{ flex: 1 }} />
+          <TextField
+            placeholder="신청자, 이메일 검색"
+            size="small"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            sx={{ minWidth: 220 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          />
           <TextField
             select
-            label="상태 필터"
+            label="상태"
             value={statusFilter || ''}
-            onChange={(e) =>
-              setStatusFilter(
-                e.target.value
-                  ? (e.target.value as SettlementStatus)
-                  : undefined,
-              )
-            }
-            sx={{ minWidth: 150 }}
+            onChange={(e) => setStatusFilter(e.target.value ? (e.target.value as SettlementStatus) : undefined)}
             size="small"
+            sx={{ minWidth: 130 }}
           >
             <MenuItem value="">전체</MenuItem>
             <MenuItem value="PENDING">정산대기</MenuItem>
+            <MenuItem value="IN_PROGRESS">정산진행중</MenuItem>
             <MenuItem value="COMPLETED">정산완료</MenuItem>
+            <MenuItem value="CANCELLED">정산취소</MenuItem>
+            <MenuItem value="HOLD">정산보류</MenuItem>
           </TextField>
+          <Tooltip title="새로고침">
+            <IconButton onClick={() => refetch()}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
-        <Suspense
-          fallback={
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-              <CircularProgress />
-            </Box>
-          }
-        >
-          <SettlementsTable statusFilter={statusFilter} />
-        </Suspense>
+
+        {/* Data Grid */}
+        <DataGrid
+          rows={settlementRows}
+          columns={settlementColumns}
+          loading={isLoading}
+          pageSizeOptions={[10, 20, 50]}
+          initialState={{ pagination: { paginationModel: { page: 0, pageSize: 20 } } }}
+          disableRowSelectionOnClick
+          rowHeight={60}
+          sx={dataGridStyles}
+          localeText={{ ...dataGridLocaleText, noRowsLabel: '정산 내역이 없습니다' }}
+        />
       </Paper>
     </Box>
   );

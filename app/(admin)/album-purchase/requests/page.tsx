@@ -1,17 +1,30 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import InputAdornment from '@mui/material/InputAdornment';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
-import { DataGrid, GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
+import Typography from '@mui/material/Typography';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import SearchIcon from '@mui/icons-material/Search';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import { useGetRequests } from '@/query/query/album-purchase/requests';
 import type { PurchaseRequestStatus } from '@/types/albumPurchase';
+import ListPageHeader from '../_components/ListPageHeader';
+import StatCard from '../_components/StatCard';
+import { dataGridStyles, dataGridLocaleText } from '../_components/dataGridStyles';
 
 const statusLabels: Record<PurchaseRequestStatus, string> = {
   DRAFT: '초안',
@@ -27,107 +40,163 @@ const statusLabels: Record<PurchaseRequestStatus, string> = {
   SETTLEMENT_COMPLETED: '정산완료',
 };
 
-function RequestsTable({
-  statusFilter,
-}: {
-  statusFilter?: PurchaseRequestStatus;
-}) {
-  const { data: requests, isLoading } = useGetRequests({
-    status: statusFilter,
-  });
+const getStatusColor = (status: PurchaseRequestStatus) => {
+  switch (status) {
+    case 'NEED_NEGOTIATION':
+    case 'FINAL_NEGOTIATION':
+      return 'warning';
+    case 'SETTLEMENT_COMPLETED':
+      return 'success';
+    case 'SUBMITTED':
+    case 'SHIPPED':
+    case 'COMPLETE_TRACKING_NUMBER':
+      return 'info';
+    case 'REVIEWING':
+    case 'FINISH_REVIEW':
+      return 'secondary';
+    case 'PENDING_SETTLEMENT':
+      return 'primary';
+    default:
+      return 'default';
+  }
+};
+
+export default function RequestsPage() {
   const router = useRouter();
+  const [statusFilter, setStatusFilter] = useState<PurchaseRequestStatus | undefined>();
+  const [searchText, setSearchText] = useState('');
+
+  const { data: requests = [], isLoading, refetch } = useGetRequests({ status: statusFilter });
+
+  // Filter by search
+  const filteredRequests = useMemo(() => {
+    if (!searchText) return requests;
+    const search = searchText.toLowerCase();
+    return requests.filter((request: any) =>
+      request.userName?.toLowerCase().includes(search) ||
+      request.userEmail?.toLowerCase().includes(search) ||
+      request.phoneNumber?.includes(search) ||
+      request.eventTitle?.toLowerCase().includes(search) ||
+      request.albumTitle?.toLowerCase().includes(search)
+    );
+  }, [requests, searchText]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = requests.length;
+    const needsAction = requests.filter((r: any) => r.status === 'NEED_NEGOTIATION' || r.status === 'FINAL_NEGOTIATION').length;
+    const inProgress = requests.filter((r: any) => ['SUBMITTED', 'SHIPPED', 'COMPLETE_TRACKING_NUMBER', 'RECEIVED_AND_MATCHED', 'REVIEWING'].includes(r.status)).length;
+    const completed = requests.filter((r: any) => r.status === 'SETTLEMENT_COMPLETED').length;
+    return { total, needsAction, inProgress, completed };
+  }, [requests]);
 
   const columns: GridColDef[] = [
-    {
-      field: 'requestId',
-      headerName: '신청 ID',
-      width: 90,
-    },
+    { field: 'requestId', headerName: '신청 ID', width: 90, headerAlign: 'center', align: 'center' },
     {
       field: 'userName',
       headerName: '신청자',
-      width: 100,
-    },
-    {
-      field: 'userEmail',
-      headerName: '이메일',
-      flex: 1,
-      minWidth: 180,
+      width: 120,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 1 }}>
+          <Typography variant="body2" fontWeight={500}>
+            {params.value}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {params.row.userEmail}
+          </Typography>
+        </Box>
+      ),
     },
     {
       field: 'phoneNumber',
       headerName: '연락처',
       width: 130,
+      renderCell: (params) => (
+        <Typography variant="body2" color="text.secondary">
+          {params.value || '-'}
+        </Typography>
+      ),
     },
     {
       field: 'eventTitle',
-      headerName: '행사명',
-      flex: 0.8,
-      minWidth: 150,
-    },
-    {
-      field: 'albumTitle',
-      headerName: '음반명',
-      flex: 0.8,
-      minWidth: 150,
+      headerName: '행사/앨범',
+      flex: 1,
+      minWidth: 200,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 1 }}>
+          <Typography variant="body2" fontWeight={500} noWrap>
+            {params.value || '-'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {params.row.albumTitle || '-'}
+          </Typography>
+        </Box>
+      ),
     },
     {
       field: 'itemCount',
-      headerName: '아이템 수',
-      width: 100,
-      type: 'number',
+      headerName: '수량',
+      width: 80,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Chip label={`${params.value || 0}개`} size="small" variant="outlined" />
+      ),
     },
     {
       field: 'totalEvaluatedPrice',
       headerName: '총 금액',
-      width: 130,
-      type: 'number',
-      renderCell: (params: any) => {
-        return `₩${params.value?.toLocaleString() || '0'}`;
-      },
+      width: 120,
+      headerAlign: 'right',
+      align: 'right',
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight={500}>
+          {params.value?.toLocaleString() || 0}원
+        </Typography>
+      ),
     },
     {
       field: 'status',
       headerName: '상태',
       width: 130,
-      renderCell: (params: any) => {
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => {
         const status = params.value as PurchaseRequestStatus;
-        const color =
-          status === 'NEED_NEGOTIATION'
-            ? 'warning'
-            : status === 'SETTLEMENT_COMPLETED'
-              ? 'success'
-              : 'default';
-        return <Chip label={statusLabels[status]} color={color} size="small" />;
+        return <Chip label={statusLabels[status] || status} color={getStatusColor(status)} size="small" />;
       },
     },
     {
       field: 'createdAt',
       headerName: '신청일',
       width: 110,
-      renderCell: (params: any) => {
-        return new Date(params.value).toLocaleDateString();
-      },
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Typography variant="body2" color="text.secondary">
+          {params.value ? new Date(params.value).toLocaleDateString() : '-'}
+        </Typography>
+      ),
     },
     {
       field: 'actions',
-      headerName: '작업',
-      type: 'actions',
+      headerName: '',
       width: 80,
-      getActions: (params: any) => [
-        <GridActionsCellItem
-          key="view"
-          icon={<VisibilityIcon />}
-          label="상세"
-          onClick={() =>
-            router.push(`/album-purchase/requests/${params.row.requestId}`)
-          }
-        />,
-      ],
+      sortable: false,
+      filterable: false,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Tooltip title="상세보기">
+          <IconButton size="small" onClick={() => router.push(`/album-purchase/requests/${params.row.requestId}`)} sx={{ color: 'primary.main' }}>
+            <VisibilityIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      ),
     },
   ];
 
-  const rows = (requests || []).map((request: any) => ({
+  const rows = filteredRequests.map((request: any) => ({
     id: request.requestId,
     requestId: request.requestId,
     userName: request.userName,
@@ -142,84 +211,77 @@ function RequestsTable({
   }));
 
   return (
-    <DataGrid
-      sx={{ height: 'auto', background: 'white', fontSize: 14 }}
-      rows={rows}
-      columns={columns}
-      pageSizeOptions={[20, 50, 100]}
-      initialState={{
-        pagination: {
-          paginationModel: { page: 0, pageSize: 20 },
-        },
-      }}
-      loading={isLoading}
-      disableRowSelectionOnClick
-    />
-  );
-}
+    <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: 'calc(100vh - 72px)' }}>
+      <ListPageHeader
+        icon={<AssignmentIcon sx={{ fontSize: 18 }} />}
+        title="매입 신청 관리"
+        description="매입 신청 목록을 조회하고 관리합니다"
+      />
 
-export default function RequestsPage() {
-  const [statusFilter, setStatusFilter] = useState<
-    PurchaseRequestStatus | undefined
-  >();
-
-  return (
-    <Box sx={{ p: 3 }}>
-      <Typography
-        variant="h6"
-        sx={{
-          background: 'white',
-          p: 2,
-          fontWeight: 500,
-          border: '1px solid',
-          borderColor: 'divider',
-          mb: 2,
-          fontSize: 18,
-        }}
-      >
-        매입 신청 관리
-      </Typography>
-
-      {/* 필터 */}
-      <Box sx={{ mb: 2 }}>
-        <TextField
-          select
-          label="상태 필터"
-          value={statusFilter || ''}
-          onChange={(e) =>
-            setStatusFilter(
-              e.target.value
-                ? (e.target.value as PurchaseRequestStatus)
-                : undefined,
-            )
-          }
-          sx={{ minWidth: 200 }}
-          size="small"
-        >
-          <MenuItem value="">전체</MenuItem>
-          <MenuItem value="NEED_NEGOTIATION">가격조정필요</MenuItem>
-          <MenuItem value="SUBMITTED">접수완료</MenuItem>
-          <MenuItem value="RECEIVED_AND_MATCHED">수령완료</MenuItem>
-          <MenuItem value="REVIEWING">검수중</MenuItem>
-          <MenuItem value="FINISH_REVIEW">검수완료</MenuItem>
-          <MenuItem value="PENDING_SETTLEMENT">정산대기</MenuItem>
-          <MenuItem value="SETTLEMENT_COMPLETED">정산완료</MenuItem>
-        </TextField>
+      {/* Stats Cards */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <StatCard title="전체 신청" value={stats.total} icon={<AssignmentIcon />} color="#1976d2" isLoading={isLoading} />
+        <StatCard title="조치 필요" value={stats.needsAction} icon={<WarningIcon />} color="#ed6c02" isLoading={isLoading} />
+        <StatCard title="처리중" value={stats.inProgress} icon={<LocalShippingIcon />} color="#0288d1" isLoading={isLoading} />
+        <StatCard title="정산 완료" value={stats.completed} icon={<CheckCircleIcon />} color="#2e7d32" isLoading={isLoading} />
       </Box>
 
-      <Paper
-        sx={{
-          background: 'white',
-          fontSize: 14,
-          fontWeight: 500,
-          border: '1px solid',
-          borderColor: 'divider',
-          p: 2,
-        }}
-      >
-        <Suspense fallback={<div>로딩 중...</div>}>
-          <RequestsTable statusFilter={statusFilter} />
-        </Suspense>
+      {/* Table Container */}
+      <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+        {/* Search Toolbar */}
+        <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <TextField
+            placeholder="신청자, 이메일, 연락처, 행사명 검색"
+            size="small"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            sx={{ minWidth: 300 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            select
+            label="상태"
+            value={statusFilter || ''}
+            onChange={(e) => setStatusFilter(e.target.value ? (e.target.value as PurchaseRequestStatus) : undefined)}
+            size="small"
+            sx={{ minWidth: 150 }}
+          >
+            <MenuItem value="">전체</MenuItem>
+            <MenuItem value="NEED_NEGOTIATION">가격조정필요</MenuItem>
+            <MenuItem value="SUBMITTED">접수완료</MenuItem>
+            <MenuItem value="SHIPPED">배송중</MenuItem>
+            <MenuItem value="RECEIVED_AND_MATCHED">수령완료</MenuItem>
+            <MenuItem value="REVIEWING">검수중</MenuItem>
+            <MenuItem value="FINISH_REVIEW">검수완료</MenuItem>
+            <MenuItem value="PENDING_SETTLEMENT">정산대기</MenuItem>
+            <MenuItem value="SETTLEMENT_COMPLETED">정산완료</MenuItem>
+          </TextField>
+          <Box sx={{ flex: 1 }} />
+          <Tooltip title="새로고침">
+            <IconButton onClick={() => refetch()}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Data Grid */}
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          loading={isLoading}
+          pageSizeOptions={[10, 20, 50]}
+          initialState={{ pagination: { paginationModel: { page: 0, pageSize: 20 } } }}
+          disableRowSelectionOnClick
+          rowHeight={60}
+          sx={dataGridStyles}
+          localeText={{ ...dataGridLocaleText, noRowsLabel: '매입 신청이 없습니다' }}
+        />
       </Paper>
     </Box>
   );
