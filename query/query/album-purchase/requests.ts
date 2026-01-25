@@ -141,9 +141,17 @@ export function useDeleteRequest() {
 
   return useMutation({
     mutationFn: (requestId: number) => deleteRequest(requestId),
-    onSuccess: () => {
+    onSuccess: (_, requestId) => {
+      // 모든 requests 관련 쿼리 무효화 (params가 다른 쿼리들 포함)
       queryClient.invalidateQueries({
-        queryKey: ['album-purchase', 'requests'],
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'album-purchase' &&
+          query.queryKey[1] === 'requests',
+      });
+      // 삭제된 request의 상세 캐시 제거
+      queryClient.removeQueries({
+        queryKey: ['album-purchase', 'request', requestId],
       });
     },
   });

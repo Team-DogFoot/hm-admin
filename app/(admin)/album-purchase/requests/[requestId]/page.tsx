@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -13,6 +13,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TablePagination from '@mui/material/TablePagination';
 import Chip from '@mui/material/Chip';
 import {
   useGetRequestDetail,
@@ -51,6 +52,10 @@ export default function RequestDetailPage() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [proposedPrice, setProposedPrice] = useState('');
   const [proposalNote, setProposalNote] = useState('');
+
+  // 아이템 목록 페이지네이션
+  const [itemsPage, setItemsPage] = useState(0);
+  const [itemsRowsPerPage, setItemsRowsPerPage] = useState(10);
 
   const handleAccept = async () => {
     if (confirm('이 매입 신청을 수락하시겠습니까?')) {
@@ -122,6 +127,22 @@ export default function RequestDetailPage() {
   };
 
   const canDelete = request && (request.status === 'DRAFT' || request.status === 'NEED_NEGOTIATION');
+
+  // 페이지네이션된 아이템
+  const paginatedItems = useMemo(() => {
+    if (!request?.items) return [];
+    const start = itemsPage * itemsRowsPerPage;
+    return request.items.slice(start, start + itemsRowsPerPage);
+  }, [request?.items, itemsPage, itemsRowsPerPage]);
+
+  // 전체 합계 계산
+  const totalSummary = useMemo(() => {
+    if (!request?.items) return { quantity: 0, price: 0 };
+    return {
+      quantity: request.items.reduce((sum, item) => sum + (item.quantity ?? 1), 0),
+      price: request.items.reduce((sum, item) => sum + (item.finalPrice ?? 0), 0),
+    };
+  }, [request?.items]);
 
   if (isLoading) {
     return (
@@ -336,9 +357,23 @@ export default function RequestDetailPage() {
 
       {/* 아이템 목록 */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
-          아이템 목록 ({request.items?.length ?? 0}건)
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontSize: 18, fontWeight: 600 }}>
+            아이템 목록 ({request.items?.length ?? 0}건)
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Chip
+              label={`총 수량: ${totalSummary.quantity.toLocaleString()}`}
+              variant="outlined"
+              size="small"
+            />
+            <Chip
+              label={`총 금액: ₩${totalSummary.price.toLocaleString()}`}
+              color="primary"
+              size="small"
+            />
+          </Box>
+        </Box>
         <Box sx={{ overflowX: 'auto' }}>
           <Table size="small">
             <TableHead>
@@ -357,7 +392,7 @@ export default function RequestDetailPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {request.items?.map((item) => {
+              {paginatedItems.map((item) => {
                 const availableType = purchaseAvailableTypeLabel[item.purchaseAvailableType] || { label: item.purchaseAvailableType, color: 'default' as const };
                 return (
                   <TableRow key={item.requestItemId}>
@@ -400,23 +435,32 @@ export default function RequestDetailPage() {
                   </TableRow>
                 );
               })}
-              {request.items && request.items.length > 0 && (
-                <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                  <TableCell colSpan={8} align="right" sx={{ fontWeight: 600 }}>
-                    합계
+              {paginatedItems.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                    아이템이 없습니다.
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    {request.items.reduce((sum, item) => sum + (item.quantity ?? 1), 0)}
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    ₩{request.items.reduce((sum, item) => sum + (item.finalPrice ?? 0), 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell />
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </Box>
+        {(request.items?.length ?? 0) > 10 && (
+          <TablePagination
+            component="div"
+            count={request.items?.length ?? 0}
+            page={itemsPage}
+            onPageChange={(_, newPage) => setItemsPage(newPage)}
+            rowsPerPage={itemsRowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setItemsRowsPerPage(parseInt(e.target.value, 10));
+              setItemsPage(0);
+            }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            labelRowsPerPage="페이지당 항목"
+            labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+          />
+        )}
       </Paper>
 
       {/* 사용자 등록 송장 목록 */}
