@@ -112,6 +112,6 @@ const BarcodeScanner = forwardRef<BarcodeScannerRef, BarcodeScannerProps>(({
       }}
     />
   );
-};
+});
 
 export default BarcodeScanner;
