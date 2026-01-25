@@ -66,7 +66,8 @@ const purchaseRequestStatusLabel: Record<PurchaseRequestStatus, string> = {
   SETTLEMENT_COMPLETED: '정산완료',
 };
 
-const allPurchaseRequestStatuses: PurchaseRequestStatus[] = [
+// 드롭다운에서 선택 가능한 상태 (검수완료/정산대기/정산완료는 검수완료 버튼으로만 처리)
+const selectableStatuses: PurchaseRequestStatus[] = [
   'DRAFT',
   'NEED_NEGOTIATION',
   'SUBMITTED',
@@ -75,9 +76,6 @@ const allPurchaseRequestStatuses: PurchaseRequestStatus[] = [
   'RECEIVED_AND_MATCHED',
   'REVIEWING',
   'FINAL_NEGOTIATION',
-  'FINISH_REVIEW',
-  'PENDING_SETTLEMENT',
-  'SETTLEMENT_COMPLETED',
 ];
 
 export default function RequestDetailPage() {
@@ -317,7 +315,7 @@ export default function RequestDetailPage() {
               label="상태 변경"
               onChange={(e) => setSelectedStatus(e.target.value as PurchaseRequestStatus)}
             >
-              {allPurchaseRequestStatuses.map((status) => (
+              {selectableStatuses.map((status) => (
                 <MenuItem key={status} value={status} disabled={status === request.status}>
                   {purchaseRequestStatusLabel[status]}
                 </MenuItem>
@@ -334,19 +332,17 @@ export default function RequestDetailPage() {
             {forceStatusMutation.isPending ? '변경 중...' : '상태 변경'}
           </Button>
 
-          {/* 검수완료 버튼 - REVIEWING 상태일 때만 표시 */}
-          {request.status === 'REVIEWING' && (
-            <Button
-              variant="contained"
-              color="success"
-              onClick={handleFinishReview}
-              disabled={finishReviewMutation.isPending}
-              startIcon={finishReviewMutation.isPending && <CircularProgress size={16} color="inherit" />}
-              sx={{ height: 40, ml: 'auto' }}
-            >
-              {finishReviewMutation.isPending ? '처리 중...' : '검수완료 (정산 생성)'}
-            </Button>
-          )}
+          {/* 검수완료 버튼 */}
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleFinishReview}
+            disabled={finishReviewMutation.isPending}
+            startIcon={finishReviewMutation.isPending && <CircularProgress size={16} color="inherit" />}
+            sx={{ height: 40, ml: 'auto' }}
+          >
+            {finishReviewMutation.isPending ? '처리 중...' : '검수완료 (정산 생성)'}
+          </Button>
         </Box>
       </Paper>
 
