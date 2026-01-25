@@ -73,6 +73,7 @@ import StatCard from '../_components/StatCard';
 import { dataGridStyles, dataGridLocaleText } from '../_components/dataGridStyles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
+import { useAuth } from '@/hooks/useAuth';
 
 // 모바일 감지 훅
 function useIsMobile() {
@@ -1192,6 +1193,7 @@ function VideoRecordDialog({
 export default function ReceiptsPage() {
   const isMobile = useIsMobile();
   const { showSnackbar, SnackbarComponent } = useSnackbar();
+  const { userEmail } = useAuth();
   const [tabValue, setTabValue] = useState<'matched' | 'unmatched'>('unmatched');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -1256,6 +1258,7 @@ export default function ReceiptsPage() {
     try {
       const result = await quickScanMutation.mutateAsync({
         trackingNumber: scannedTrackingNumber,
+        receivedBy: userEmail || undefined,
       });
 
       showSnackbar(`수령 건이 생성되었습니다. (ID: ${result.receiptId})`, 'success');
