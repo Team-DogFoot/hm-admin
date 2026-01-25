@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import Alert from '@mui/material/Alert';
 import Skeleton from '@mui/material/Skeleton';
-import LockIcon from '@mui/icons-material/Lock';
 import { useGetAlbums, useUpdateAlbum } from '@/query/query/album-purchase/albums';
 import { useSnackbar } from '../../../_components/useSnackbar';
 import ImageUploader from '@/components/ImageUploader';
@@ -118,6 +116,11 @@ export default function EditAlbumPage({ params }: { params: { id: string } }) {
         albumDescription: formData.albumDescription,
         memo: formData.memo,
         thumbnailImageUrls: thumbnailImages,
+        salePrice: Number(formData.salePrice) || 0,
+        defaultPurchasePrice: Number(formData.defaultPurchasePrice) || 0,
+        currentStock: Number(formData.currentStock) || 0,
+        softPurchaseLimit: Number(formData.softPurchaseLimit) || 0,
+        hardPurchaseLimit: Number(formData.hardPurchaseLimit) || 0,
       });
       showSnackbar('앨범 정보가 수정되었습니다.', 'success');
       setTimeout(() => router.push('/album-purchase/albums'), 1500);
@@ -154,19 +157,16 @@ export default function EditAlbumPage({ params }: { params: { id: string } }) {
           </Box>
         </FormSection>
 
-        <FormSection title="매입 설정" description="매입 관련 설정은 현재 수정이 불가능합니다">
-          <Alert severity="warning" icon={<LockIcon fontSize="small" />} sx={{ mb: 3 }}>
-            <Typography variant="body2">아래 항목들은 API 제한으로 수정할 수 없습니다. 변경이 필요한 경우 개발팀에 문의하세요.</Typography>
-          </Alert>
+        <FormSection title="매입 설정" description="매입 관련 가격 및 재고 설정을 수정합니다">
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <Row>
-              <TextField fullWidth label="판매가" type="number" disabled value={formData.salePrice} InputProps={{ endAdornment: <Typography color="text.secondary">원</Typography>, startAdornment: <LockIcon fontSize="small" color="disabled" sx={{ mr: 1 }} /> }} />
-              <TextField fullWidth label="기본 매입가" type="number" disabled value={formData.defaultPurchasePrice} InputProps={{ endAdornment: <Typography color="text.secondary">원</Typography>, startAdornment: <LockIcon fontSize="small" color="disabled" sx={{ mr: 1 }} /> }} />
+              <TextField fullWidth label="판매가" type="number" value={formData.salePrice} onChange={(e) => handleChange('salePrice', e.target.value)} InputProps={{ endAdornment: <Typography color="text.secondary">원</Typography> }} />
+              <TextField fullWidth label="기본 매입가" type="number" value={formData.defaultPurchasePrice} onChange={(e) => handleChange('defaultPurchasePrice', e.target.value)} InputProps={{ endAdornment: <Typography color="text.secondary">원</Typography> }} />
             </Row>
             <Row3>
-              <TextField fullWidth label="현재 재고" type="number" disabled value={formData.currentStock} InputProps={{ endAdornment: <Typography color="text.secondary">개</Typography>, startAdornment: <LockIcon fontSize="small" color="disabled" sx={{ mr: 1 }} /> }} />
-              <TextField fullWidth label="Soft Limit" type="number" disabled value={formData.softPurchaseLimit} InputProps={{ endAdornment: <LimitTooltip type="soft" />, startAdornment: <LockIcon fontSize="small" color="disabled" sx={{ mr: 1 }} /> }} />
-              <TextField fullWidth label="Hard Limit" type="number" disabled value={formData.hardPurchaseLimit} InputProps={{ endAdornment: <LimitTooltip type="hard" />, startAdornment: <LockIcon fontSize="small" color="disabled" sx={{ mr: 1 }} /> }} />
+              <TextField fullWidth label="현재 재고" type="number" value={formData.currentStock} onChange={(e) => handleChange('currentStock', e.target.value)} InputProps={{ endAdornment: <Typography color="text.secondary">개</Typography> }} />
+              <TextField fullWidth label="Soft Limit" type="number" value={formData.softPurchaseLimit} onChange={(e) => handleChange('softPurchaseLimit', e.target.value)} InputProps={{ endAdornment: <LimitTooltip type="soft" /> }} />
+              <TextField fullWidth label="Hard Limit" type="number" value={formData.hardPurchaseLimit} onChange={(e) => handleChange('hardPurchaseLimit', e.target.value)} InputProps={{ endAdornment: <LimitTooltip type="hard" /> }} />
             </Row3>
           </Box>
         </FormSection>

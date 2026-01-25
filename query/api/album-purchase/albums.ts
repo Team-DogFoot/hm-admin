@@ -72,6 +72,12 @@ export interface UpdateAlbumRequest {
   memo?: string;
   // 썸네일 이미지 URL 목록
   thumbnailImageUrls?: string[];
+  // 매입 설정 필드
+  salePrice?: number;
+  defaultPurchasePrice?: number;
+  currentStock?: number;
+  softPurchaseLimit?: number;
+  hardPurchaseLimit?: number;
 }
 
 // 앨범 목록 조회
