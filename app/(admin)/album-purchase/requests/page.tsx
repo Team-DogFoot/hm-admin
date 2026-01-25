@@ -130,18 +130,28 @@ export default function RequestsPage() {
     }
   };
 
-  // Filter by search
+  // 검수완료 이후 상태 (기본 목록에서 숨김)
+  const completedStatuses: PurchaseRequestStatus[] = ['FINISH_REVIEW', 'PENDING_SETTLEMENT', 'SETTLEMENT_COMPLETED'];
+
+  // Filter by search and hide completed statuses by default
   const filteredRequests = useMemo(() => {
-    if (!searchText) return requests;
+    let filtered = requests;
+
+    // 상태 필터가 없으면 검수완료 이후 상태는 숨김
+    if (!statusFilter) {
+      filtered = filtered.filter((request: any) => !completedStatuses.includes(request.status));
+    }
+
+    if (!searchText) return filtered;
     const search = searchText.toLowerCase();
-    return requests.filter((request: any) =>
+    return filtered.filter((request: any) =>
       request.userName?.toLowerCase().includes(search) ||
       request.userEmail?.toLowerCase().includes(search) ||
       request.phoneNumber?.includes(search) ||
       request.eventTitle?.toLowerCase().includes(search) ||
       request.albumTitle?.toLowerCase().includes(search)
     );
-  }, [requests, searchText]);
+  }, [requests, searchText, statusFilter]);
 
   // Stats
   const stats = useMemo(() => {
