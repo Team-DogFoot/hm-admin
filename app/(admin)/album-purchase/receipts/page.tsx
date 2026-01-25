@@ -742,6 +742,7 @@ function EditReceiptDialog({
   useEffect(() => {
     if (receipt) {
       setFormData({
+        trackingNumber: receipt.trackingNumber || undefined,
         shippingCompany: receipt.shippingCompany || undefined,
         receivedBy: receipt.receivedBy || undefined,
         senderName: receipt.senderName || undefined,
@@ -767,8 +768,8 @@ function EditReceiptDialog({
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
             label="송장번호"
-            value={receipt?.trackingNumber || ''}
-            disabled
+            value={formData.trackingNumber || ''}
+            onChange={(e) => handleChange('trackingNumber', e.target.value || undefined)}
             fullWidth
             size="small"
           />

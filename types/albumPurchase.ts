@@ -231,6 +231,7 @@ export interface QuickScanResponse {
 }
 
 export interface UpdateReceiptRequest {
+  trackingNumber?: string;
   shippingCompany?: string;
   receivedBy?: string;
   senderName?: string;
