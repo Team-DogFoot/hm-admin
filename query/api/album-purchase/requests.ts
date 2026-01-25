@@ -3,12 +3,14 @@ import { requests } from '../../request';
 import type {
   AlbumPurchaseRequestSimple,
   AlbumPurchaseRequestDetail,
+  RequestItem,
   PurchaseRequestStatus,
   AcceptRequestDTO,
   RejectRequestDTO,
   ProposeRequestDTO,
   UpdateStatusRequestDTO,
   UpdateStatusResponseDTO,
+  UpdateRequestItemDTO,
 } from '@/types/albumPurchase';
 
 const BASE_URL = `${API_URL}/logi/album-purchase/admin/request`;
@@ -171,4 +173,27 @@ export const deleteRequest = async (requestId: number): Promise<void> => {
     alert(`${errorMessage}\n${errorCode}`);
     throw new Error(errorMessage);
   }
+};
+
+// 매입 신청 아이템 수정
+export const updateRequestItem = async (
+  requestId: number,
+  itemId: number,
+  requestData: UpdateRequestItemDTO,
+): Promise<RequestItem> => {
+  const { data } = await requests({
+    method: 'patch',
+    url: `${BASE_URL}/${requestId}/items/${itemId}`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as RequestItem;
 };

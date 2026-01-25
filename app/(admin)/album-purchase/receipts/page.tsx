@@ -752,6 +752,7 @@ function EditReceiptDialog({
         damagedCount: receipt.damagedCount ?? undefined,
         hasSignedAlbum: receipt.hasSignedAlbum ?? false,
         hasUnreleasedPhotocard: receipt.hasUnreleasedPhotocard ?? false,
+        photocardCount: receipt.photocardCount ?? undefined,
         memo: receipt.memo || undefined,
       });
     }
@@ -844,7 +845,7 @@ function EditReceiptDialog({
             />
           </Stack>
 
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={2} alignItems="center">
             <FormControlLabel
               control={
                 <Switch
@@ -862,6 +863,14 @@ function EditReceiptDialog({
                 />
               }
               label="미공개 포토카드"
+            />
+            <TextField
+              label="포토카드 수량"
+              type="number"
+              value={formData.photocardCount ?? ''}
+              onChange={(e) => handleChange('photocardCount', e.target.value ? parseInt(e.target.value) : undefined)}
+              size="small"
+              sx={{ width: 140 }}
             />
           </Stack>
 

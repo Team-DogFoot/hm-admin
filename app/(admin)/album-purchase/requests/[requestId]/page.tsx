@@ -15,14 +15,24 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import TablePagination from '@mui/material/TablePagination';
 import Chip from '@mui/material/Chip';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Stack from '@mui/material/Stack';
+import MenuItem from '@mui/material/MenuItem';
+import IconButton from '@mui/material/IconButton';
+import EditIcon from '@mui/icons-material/Edit';
 import {
   useGetRequestDetail,
   useAcceptRequest,
   useRejectRequest,
   useProposePrice,
   useDeleteRequest,
+  useUpdateRequestItem,
 } from '@/query/query/album-purchase/requests';
 import { useSnackbar } from '../../_components/useSnackbar';
+import type { RequestItem, PurchaseAvailableType, EventPurchaseType } from '@/types/albumPurchase';
 
 const purchaseAvailableTypeLabel: Record<string, { label: string; color: 'success' | 'warning' | 'error' }> = {
   AVAILABLE: { label: '매입가능', color: 'success' },
@@ -48,6 +58,7 @@ export default function RequestDetailPage() {
   const rejectMutation = useRejectRequest();
   const proposeMutation = useProposePrice();
   const deleteMutation = useDeleteRequest();
+  const updateItemMutation = useUpdateRequestItem();
 
   const [rejectionReason, setRejectionReason] = useState('');
   const [proposedPrice, setProposedPrice] = useState('');
@@ -56,6 +67,15 @@ export default function RequestDetailPage() {
   // 아이템 목록 페이지네이션
   const [itemsPage, setItemsPage] = useState(0);
   const [itemsRowsPerPage, setItemsRowsPerPage] = useState(10);
+
+  // 아이템 수정 다이얼로그
+  const [editingItem, setEditingItem] = useState<RequestItem | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    purchaseAvailableType?: PurchaseAvailableType;
+    evaluatedPrice?: number;
+    quantity?: number;
+    note?: string;
+  }>({});
 
   const handleAccept = async () => {
     if (confirm('이 매입 신청을 수락하시겠습니까?')) {
@@ -123,6 +143,36 @@ export default function RequestDetailPage() {
       } catch (error: any) {
         showSnackbar(error?.message || '삭제에 실패했습니다.', 'error');
       }
+    }
+  };
+
+  const handleEditItem = (item: RequestItem) => {
+    setEditingItem(item);
+    setEditFormData({
+      purchaseAvailableType: item.purchaseAvailableType,
+      evaluatedPrice: item.evaluatedPrice,
+      quantity: item.quantity,
+      note: item.note || '',
+    });
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditingItem(null);
+    setEditFormData({});
+  };
+
+  const handleSaveItem = async () => {
+    if (!editingItem) return;
+    try {
+      await updateItemMutation.mutateAsync({
+        requestId,
+        itemId: editingItem.requestItemId,
+        requestData: editFormData,
+      });
+      showSnackbar('아이템이 수정되었습니다.', 'success');
+      handleCloseEditDialog();
+    } catch (error: any) {
+      showSnackbar(error?.message || '수정에 실패했습니다.', 'error');
     }
   };
 
@@ -389,6 +439,7 @@ export default function RequestDetailPage() {
                 <TableCell align="right">수량</TableCell>
                 <TableCell align="right">합계</TableCell>
                 <TableCell>비고</TableCell>
+                <TableCell align="center">수정</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -432,12 +483,17 @@ export default function RequestDetailPage() {
                     <TableCell sx={{ maxWidth: 150, fontSize: 12 }}>
                       {item.note || '-'}
                     </TableCell>
+                    <TableCell align="center">
+                      <IconButton size="small" onClick={() => handleEditItem(item)}>
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
                   </TableRow>
                 );
               })}
               {paginatedItems.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                  <TableCell colSpan={12} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     아이템이 없습니다.
                   </TableCell>
                 </TableRow>
@@ -521,9 +577,12 @@ export default function RequestDetailPage() {
                 <TableCell>송장번호</TableCell>
                 <TableCell>택배사</TableCell>
                 <TableCell>수량</TableCell>
+                <TableCell>포토카드</TableCell>
+                <TableCell>싸인앨범</TableCell>
                 <TableCell>수령 여부</TableCell>
                 <TableCell>수령일</TableCell>
                 <TableCell>수령자</TableCell>
+                <TableCell>영상</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -532,6 +591,16 @@ export default function RequestDetailPage() {
                   <TableCell sx={{ fontFamily: 'monospace' }}>{shipping.trackingNumber}</TableCell>
                   <TableCell>{shipping.shippingCompany || '-'}</TableCell>
                   <TableCell>{shipping.actualQuantity ?? '-'}</TableCell>
+                  <TableCell>{shipping.photocardCount ?? '-'}</TableCell>
+                  <TableCell>
+                    {shipping.hasSignedAlbum !== undefined ? (
+                      <Chip
+                        label={shipping.hasSignedAlbum ? '있음' : '없음'}
+                        color={shipping.hasSignedAlbum ? 'warning' : 'default'}
+                        size="small"
+                      />
+                    ) : '-'}
+                  </TableCell>
                   <TableCell>
                     <Chip
                       label={shipping.isReceived ? '완료' : '대기'}
@@ -545,6 +614,19 @@ export default function RequestDetailPage() {
                       : '-'}
                   </TableCell>
                   <TableCell>{shipping.receivedBy || '-'}</TableCell>
+                  <TableCell>
+                    {shipping.videoUrl ? (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        href={shipping.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        영상
+                      </Button>
+                    ) : '-'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -668,6 +750,81 @@ export default function RequestDetailPage() {
           </Box>
         </Paper>
       )}
+
+      {/* 아이템 수정 다이얼로그 */}
+      <Dialog open={!!editingItem} onClose={handleCloseEditDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>아이템 수정</DialogTitle>
+        <DialogContent>
+          {editingItem && (
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {editingItem.albumTitle} - {editingItem.albumArtist}
+              </Typography>
+
+              <TextField
+                select
+                label="매입상태"
+                value={editFormData.purchaseAvailableType || ''}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, purchaseAvailableType: e.target.value as PurchaseAvailableType }))}
+                fullWidth
+                size="small"
+              >
+                <MenuItem value="AVAILABLE">매입가능</MenuItem>
+                <MenuItem value="NEED_NEGOTIATION">조정필요</MenuItem>
+                <MenuItem value="UNAVAILABLE">매입불가</MenuItem>
+              </TextField>
+
+              <TextField
+                label="단가"
+                type="number"
+                value={editFormData.evaluatedPrice ?? ''}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, evaluatedPrice: e.target.value ? parseInt(e.target.value) : undefined }))}
+                fullWidth
+                size="small"
+                InputProps={{ startAdornment: <Typography sx={{ mr: 0.5 }}>₩</Typography> }}
+              />
+
+              <TextField
+                label="수량"
+                type="number"
+                value={editFormData.quantity ?? ''}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, quantity: e.target.value ? parseInt(e.target.value) : undefined }))}
+                fullWidth
+                size="small"
+              />
+
+              <TextField
+                label="비고"
+                value={editFormData.note || ''}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, note: e.target.value }))}
+                fullWidth
+                size="small"
+                multiline
+                rows={2}
+              />
+
+              {editFormData.evaluatedPrice && editFormData.quantity && (
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  합계: ₩{((editFormData.evaluatedPrice || 0) * (editFormData.quantity || 1)).toLocaleString()}
+                </Typography>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseEditDialog} disabled={updateItemMutation.isPending}>
+            취소
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveItem}
+            disabled={updateItemMutation.isPending}
+            startIcon={updateItemMutation.isPending && <CircularProgress size={16} color="inherit" />}
+          >
+            {updateItemMutation.isPending ? '저장 중...' : '저장'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

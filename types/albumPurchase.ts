@@ -206,6 +206,9 @@ export interface ShippingInfo {
   requestId?: number;
   memo?: string;
   matchedReceiptId?: number;
+  photocardCount?: number;
+  hasSignedAlbum?: boolean;
+  videoUrl?: string;
 }
 
 export interface TrackingNumberInfo {
@@ -241,6 +244,7 @@ export interface UpdateReceiptRequest {
   damagedCount?: number;
   hasSignedAlbum?: boolean;
   hasUnreleasedPhotocard?: boolean;
+  photocardCount?: number;
   memo?: string;
 }
 
@@ -277,6 +281,7 @@ export interface UnmatchedReceiptDetail {
   damagedCount?: number;
   hasSignedAlbum?: boolean;
   hasUnreleasedPhotocard?: boolean;
+  photocardCount?: number;
   videoUrl?: string;
   isMatched: boolean;
   matchedRequestId?: number;
@@ -395,6 +400,14 @@ export interface UpdateStatusResponseDTO {
   status: string;
   message: string;
   allowedTransitions?: PurchaseRequestStatus[];
+}
+
+export interface UpdateRequestItemDTO {
+  eventPurchaseType?: EventPurchaseType;
+  purchaseAvailableType?: PurchaseAvailableType;
+  evaluatedPrice?: number;
+  quantity?: number;
+  note?: string;
 }
 
 // Dashboard Stats
