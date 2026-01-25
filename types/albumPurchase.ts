@@ -141,15 +141,21 @@ export interface AlbumPurchaseRequestDetail {
   totalEvaluatedPrice: number;
   totalEvaluatedStock: number;
   blockAction: string;
+  // 신청자 정보
   userId: number;
   userEmail: string;
   userName: string;
-  phoneNumber: string;
+  // 배송지 정보 (신청 시 선택한 주소)
+  recipientName: string;
+  recipientPhone: string;
   address: string;
   addressDetail: string;
   zipcode: string;
+  // 은행 정보
   bankName: string;
   bankAccountNumber: string;
+  bankAccountHolderName: string;
+  // 행사 정보
   eventId: number;
   eventTitle: string;
   items: RequestItem[];
@@ -165,13 +171,28 @@ export interface AlbumPurchaseRequestDetail {
   settledAt?: string;
 }
 
+export type PurchaseAvailableType =
+  | 'AVAILABLE'
+  | 'NEED_NEGOTIATION'
+  | 'UNAVAILABLE';
+
 export interface RequestItem {
   requestItemId: number;
+  albumId: number;
   albumTitle: string;
   albumArtist: string;
   albumIsbn: string;
+  entertainmentAgency?: string;
+  eventId?: number;
+  eventTitle?: string;
   evaluatedPrice: number;
+  quantity: number;
+  finalPrice: number;
   itemOrder: number;
+  purchaseAvailableType: PurchaseAvailableType;
+  eventPurchaseType?: EventPurchaseType;
+  note?: string;
+  albumThumbnailUrl?: string;
 }
 
 export interface ShippingInfo {

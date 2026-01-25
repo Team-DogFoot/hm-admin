@@ -6,6 +6,7 @@ import {
   rejectRequest,
   proposePrice,
   updateRequestStatus,
+  deleteRequest,
 } from '../../api/album-purchase/requests';
 import type {
   PurchaseRequestStatus,
@@ -129,6 +130,20 @@ export function useUpdateRequestStatus() {
       });
       queryClient.invalidateQueries({
         queryKey: ['album-purchase', 'request', variables.requestId],
+      });
+    },
+  });
+}
+
+// 매입 신청 삭제
+export function useDeleteRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (requestId: number) => deleteRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'requests'],
       });
     },
   });

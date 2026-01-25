@@ -154,3 +154,21 @@ export const updateRequestStatus = async (
 
   return data as UpdateStatusResponseDTO;
 };
+
+// 매입 신청 삭제
+export const deleteRequest = async (requestId: number): Promise<void> => {
+  const { data } = await requests({
+    method: 'delete',
+    url: `${BASE_URL}/${requestId}`,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    alert(`${errorMessage}\n${errorCode}\n${customMessage}`);
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    alert(`${errorMessage}\n${errorCode}`);
+    throw new Error(errorMessage);
+  }
+};

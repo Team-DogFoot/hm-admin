@@ -702,7 +702,7 @@ function MatchContextPanel({
                     #{requestDetail.requestId} · {requestDetail.userName}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {requestDetail.userEmail} · {requestDetail.phoneNumber || '연락처 없음'}
+                    {requestDetail.userEmail} · {requestDetail.recipientPhone || '연락처 없음'}
                   </Typography>
                 </Box>
                 <Box>
