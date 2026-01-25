@@ -40,7 +40,15 @@ import {
   quickScanReceipt,
   updateReceiptVideoUrl,
   createReceiptPresignedUrl,
+  updateReceipt,
 } from '@/query/api/album-purchase/receipts';
+import { SHIPPING_COMPANIES } from '@/constants/shippingCompanies';
+import type { UpdateReceiptRequest } from '@/types/albumPurchase';
+import MenuItem from '@mui/material/MenuItem';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Stack from '@mui/material/Stack';
+import Divider from '@mui/material/Divider';
 
 function Sidebar() {
   const { showSnackbar } = useSnackbar();
@@ -70,7 +78,7 @@ function Sidebar() {
   // Receipt modal state
   const [openReceiptModal, setOpenReceiptModal] = React.useState(false);
   const [receiptStep, setReceiptStep] = React.useState<
-    'scanning' | 'processing' | 'ask-video' | 'recording' | 'uploading' | 'complete'
+    'scanning' | 'processing' | 'ask-video' | 'recording' | 'uploading' | 'input-details' | 'complete'
   >('scanning');
   const [scannedReceipt, setScannedReceipt] = React.useState<{
     id: number;
@@ -81,6 +89,8 @@ function Sidebar() {
   const receiptMediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const receiptChunksRef = React.useRef<Blob[]>([]);
   const [receiptIsRecording, setReceiptIsRecording] = React.useState(false);
+  const [receiptFormData, setReceiptFormData] = React.useState<UpdateReceiptRequest>({});
+  const [isReceiptSaving, setIsReceiptSaving] = React.useState(false);
 
   // 디바이스 기능 감지
   React.useEffect(() => {
@@ -412,12 +422,10 @@ function Sidebar() {
 
       await updateReceiptVideoUrl(scannedReceipt.id, { videoUrl: presignedData.uploadFileUrl });
 
-      setReceiptStep('complete');
       showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
-
-      setTimeout(() => {
-        resetReceiptModal();
-      }, 1500);
+      // 영상 업로드 후 내용물 입력 단계로 이동
+      initReceiptFormData();
+      setReceiptStep('input-details');
     } catch (error: any) {
       console.error('Upload error:', error);
       showSnackbar(error?.message || '업로드 중 오류가 발생했습니다', 'error');
@@ -431,6 +439,14 @@ function Sidebar() {
     setReceiptVideoBlob(null);
     setReceiptIsRecording(false);
     receiptChunksRef.current = [];
+    setReceiptFormData({});
+    setIsReceiptSaving(false);
+  };
+
+  const initReceiptFormData = () => {
+    setReceiptFormData({
+      receivedBy: userEmail || undefined,
+    });
   };
 
   const closeReceiptModal = () => {
@@ -443,7 +459,40 @@ function Sidebar() {
 
   const skipReceiptVideo = () => {
     showSnackbar('영상 촬영을 건너뛰었습니다', 'info');
-    resetReceiptModal();
+    // 영상 건너뛰고 내용물 입력 단계로 이동
+    initReceiptFormData();
+    setReceiptStep('input-details');
+  };
+
+  const handleReceiptFormChange = (field: keyof UpdateReceiptRequest, value: any) => {
+    setReceiptFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const saveReceiptDetails = async () => {
+    if (!scannedReceipt) return;
+
+    setIsReceiptSaving(true);
+    try {
+      await updateReceipt(scannedReceipt.id, receiptFormData);
+      showSnackbar('내용물 정보가 저장되었습니다', 'success');
+      setReceiptStep('complete');
+      setTimeout(() => {
+        resetReceiptModal();
+      }, 1500);
+    } catch (error: any) {
+      console.error('Save receipt details error:', error);
+      showSnackbar(error?.message || '저장 중 오류가 발생했습니다', 'error');
+    } finally {
+      setIsReceiptSaving(false);
+    }
+  };
+
+  const skipReceiptDetails = () => {
+    showSnackbar('내용물 입력을 건너뛰었습니다', 'info');
+    setReceiptStep('complete');
+    setTimeout(() => {
+      resetReceiptModal();
+    }, 1500);
   };
 
   const showPocaMenus =
@@ -1078,6 +1127,159 @@ function Sidebar() {
                   <Typography variant="body1" textAlign="center" color="text.secondary">
                     잠시만 기다려주세요
                   </Typography>
+                </Box>
+              )}
+
+              {/* Step: Input Details */}
+              {receiptStep === 'input-details' && (
+                <Box
+                  sx={{
+                    width: '100%',
+                    maxWidth: 500,
+                    maxHeight: '80vh',
+                    overflowY: 'auto',
+                    px: 2,
+                  }}
+                >
+                  <Typography variant="h6" textAlign="center" fontWeight="bold" sx={{ mb: 3 }}>
+                    내용물 입력
+                  </Typography>
+                  {scannedReceipt?.barcode && (
+                    <Typography variant="body2" textAlign="center" color="text.secondary" sx={{ mb: 2 }}>
+                      송장번호: {scannedReceipt.barcode}
+                    </Typography>
+                  )}
+
+                  <Stack spacing={2}>
+                    <TextField
+                      select
+                      label="택배사"
+                      value={receiptFormData.shippingCompany || ''}
+                      onChange={(e) => handleReceiptFormChange('shippingCompany', e.target.value || undefined)}
+                      fullWidth
+                      size="small"
+                    >
+                      <MenuItem value="">선택 안함</MenuItem>
+                      {SHIPPING_COMPANIES.map((company) => (
+                        <MenuItem key={company.value} value={company.value}>
+                          {company.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+
+                    <TextField
+                      label="보낸사람"
+                      value={receiptFormData.senderName || ''}
+                      onChange={(e) => handleReceiptFormChange('senderName', e.target.value || undefined)}
+                      fullWidth
+                      size="small"
+                    />
+
+                    <TextField
+                      label="배송처"
+                      value={receiptFormData.deliveryDestination || ''}
+                      onChange={(e) => handleReceiptFormChange('deliveryDestination', e.target.value || undefined)}
+                      fullWidth
+                      size="small"
+                    />
+
+                    <TextField
+                      label="수령자"
+                      value={receiptFormData.receivedBy || ''}
+                      onChange={(e) => handleReceiptFormChange('receivedBy', e.target.value || undefined)}
+                      fullWidth
+                      size="small"
+                    />
+
+                    <Divider />
+
+                    <Stack direction="row" spacing={2}>
+                      <TextField
+                        label="도착수량"
+                        type="number"
+                        value={receiptFormData.arrivedQuantity ?? ''}
+                        onChange={(e) => handleReceiptFormChange('arrivedQuantity', e.target.value ? parseInt(e.target.value) : undefined)}
+                        fullWidth
+                        size="small"
+                        inputProps={{ inputMode: 'numeric' }}
+                      />
+                      <TextField
+                        label="정상매입"
+                        type="number"
+                        value={receiptFormData.normalPurchaseCount ?? ''}
+                        onChange={(e) => handleReceiptFormChange('normalPurchaseCount', e.target.value ? parseInt(e.target.value) : undefined)}
+                        fullWidth
+                        size="small"
+                        inputProps={{ inputMode: 'numeric' }}
+                      />
+                      <TextField
+                        label="파손"
+                        type="number"
+                        value={receiptFormData.damagedCount ?? ''}
+                        onChange={(e) => handleReceiptFormChange('damagedCount', e.target.value ? parseInt(e.target.value) : undefined)}
+                        fullWidth
+                        size="small"
+                        inputProps={{ inputMode: 'numeric' }}
+                      />
+                    </Stack>
+
+                    <Stack direction="row" spacing={2}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={receiptFormData.hasSignedAlbum ?? false}
+                            onChange={(e) => handleReceiptFormChange('hasSignedAlbum', e.target.checked)}
+                          />
+                        }
+                        label="싸인앨범"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={receiptFormData.hasUnreleasedPhotocard ?? false}
+                            onChange={(e) => handleReceiptFormChange('hasUnreleasedPhotocard', e.target.checked)}
+                          />
+                        }
+                        label="미공개 포카"
+                      />
+                    </Stack>
+
+                    <TextField
+                      label="메모"
+                      value={receiptFormData.memo || ''}
+                      onChange={(e) => handleReceiptFormChange('memo', e.target.value || undefined)}
+                      fullWidth
+                      size="small"
+                      multiline
+                      rows={2}
+                    />
+
+                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                      <Button
+                        variant="outlined"
+                        color="inherit"
+                        fullWidth
+                        size="large"
+                        onClick={skipReceiptDetails}
+                        disabled={isReceiptSaving}
+                        sx={{ py: 1.5, borderRadius: 2 }}
+                      >
+                        건너뛰기
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        fullWidth
+                        size="large"
+                        onClick={saveReceiptDetails}
+                        disabled={isReceiptSaving}
+                        startIcon={isReceiptSaving ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                        sx={{ py: 1.5, borderRadius: 2 }}
+                      >
+                        {isReceiptSaving ? '저장 중...' : '저장'}
+                      </Button>
+                    </Box>
+                  </Stack>
                 </Box>
               )}
 

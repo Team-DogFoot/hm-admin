@@ -38,7 +38,10 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VideocamIcon from '@mui/icons-material/Videocam';
+import StopIcon from '@mui/icons-material/Stop';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import axios from 'axios';
+import { createReceiptPresignedUrl, updateReceiptVideoUrl } from '@/query/api/album-purchase/receipts';
 import {
   useQuickScanReceipt,
   useUpdateReceipt,
@@ -888,53 +891,298 @@ function EditReceiptDialog({
   );
 }
 
-// 영상 녹화 안내 다이얼로그
+// 영상 녹화 다이얼로그 (웹캠 녹화 + URL 직접 입력)
 function VideoRecordDialog({
   open,
   receiptId,
+  trackingNumber,
   onClose,
-  onSkip,
-  onSaveVideoUrl,
-  isLoading,
+  onComplete,
 }: {
   open: boolean;
   receiptId: number | null;
+  trackingNumber?: string;
   onClose: () => void;
-  onSkip: () => void;
-  onSaveVideoUrl: (url: string) => void;
-  isLoading: boolean;
+  onComplete: () => void;
 }) {
+  const [mode, setMode] = useState<'select' | 'webcam' | 'url'>('select');
   const [videoUrl, setVideoUrl] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // 다이얼로그 닫을 때 정리
+  useEffect(() => {
+    if (!open) {
+      stopCamera();
+      setMode('select');
+      setVideoUrl('');
+      setVideoBlob(null);
+      setIsRecording(false);
+      setIsLoading(false);
+    }
+  }, [open]);
+
+  const getSupportedMimeType = (): string => {
+    const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return 'video/webm';
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const startWebcam = async () => {
+    setMode('webcam');
+    try {
+      // 카메라 해제 대기
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err) {
+      console.error('Webcam error:', err);
+      alert('카메라에 접근할 수 없습니다.');
+      setMode('select');
+    }
+  };
+
+  const startRecording = () => {
+    if (!streamRef.current) return;
+
+    chunksRef.current = [];
+    const mimeType = getSupportedMimeType();
+    const mediaRecorder = new MediaRecorder(streamRef.current, { mimeType });
+    mediaRecorderRef.current = mediaRecorder;
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      setVideoBlob(blob);
+      setIsRecording(false);
+    };
+
+    mediaRecorder.start(1000);
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const uploadVideo = async () => {
+    if (!videoBlob || !receiptId) return;
+
+    setIsLoading(true);
+    try {
+      const fileName = `receipt_${receiptId}_${Date.now()}.webm`;
+      const fileType = videoBlob.type || 'video/webm';
+      const presignedData = await createReceiptPresignedUrl(receiptId, fileName, fileType);
+
+      await axios.put(presignedData.presignedUrl, videoBlob, {
+        headers: { 'Content-Type': fileType },
+      });
+
+      await updateReceiptVideoUrl(receiptId, { videoUrl: presignedData.uploadFileUrl });
+      stopCamera();
+      onComplete();
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      alert(err?.message || '업로드 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveVideoUrl = async () => {
+    if (!videoUrl.trim() || !receiptId) return;
+
+    setIsLoading(true);
+    try {
+      await updateReceiptVideoUrl(receiptId, { videoUrl: videoUrl.trim() });
+      onComplete();
+    } catch (err: any) {
+      console.error('Save URL error:', err);
+      alert(err?.message || '저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSkip = () => {
+    stopCamera();
+    onComplete();
+  };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>개봉 영상 녹화</DialogTitle>
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>
+        개봉 영상 촬영
+        {trackingNumber && (
+          <Typography variant="body2" color="text.secondary">
+            송장번호: {trackingNumber}
+          </Typography>
+        )}
+      </DialogTitle>
       <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Alert severity="info">
-            택배 개봉 영상을 녹화하시겠습니까? 영상 녹화 후 S3에 업로드된 URL을 입력해주세요.
-          </Alert>
-          <TextField
-            label="영상 URL"
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            fullWidth
-            size="small"
-            placeholder="https://s3.amazonaws.com/..."
-          />
-        </Stack>
+        {/* 선택 화면 */}
+        {mode === 'select' && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Alert severity="info">
+              택배 개봉 영상을 촬영하시겠습니까?
+            </Alert>
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<VideocamIcon />}
+              onClick={startWebcam}
+              sx={{ py: 2 }}
+            >
+              웹캠으로 촬영
+            </Button>
+            <Button
+              variant="outlined"
+              size="large"
+              onClick={() => setMode('url')}
+              sx={{ py: 2 }}
+            >
+              URL 직접 입력
+            </Button>
+          </Stack>
+        )}
+
+        {/* 웹캠 녹화 화면 */}
+        {mode === 'webcam' && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Box
+              sx={{
+                width: '100%',
+                height: 300,
+                bgcolor: '#000',
+                borderRadius: 2,
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <video
+                ref={videoRef}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                muted
+                playsInline
+              />
+            </Box>
+            {isRecording && (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: 'error.main' }}>
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    bgcolor: 'error.main',
+                    animation: 'pulse 1s infinite',
+                    '@keyframes pulse': { '0%': { opacity: 1 }, '50%': { opacity: 0.5 }, '100%': { opacity: 1 } },
+                  }}
+                />
+                <Typography fontWeight="bold">녹화 중...</Typography>
+              </Box>
+            )}
+            {videoBlob && !isRecording && (
+              <Alert severity="success">
+                녹화 완료! ({(videoBlob.size / (1024 * 1024)).toFixed(2)}MB)
+              </Alert>
+            )}
+            <Stack direction="row" spacing={2}>
+              {!isRecording && !videoBlob && (
+                <Button variant="contained" color="error" fullWidth onClick={startRecording} startIcon={<VideocamIcon />}>
+                  녹화 시작
+                </Button>
+              )}
+              {isRecording && (
+                <Button variant="contained" color="error" fullWidth onClick={stopRecording} startIcon={<StopIcon />}>
+                  녹화 중지
+                </Button>
+              )}
+              {videoBlob && !isRecording && (
+                <>
+                  <Button variant="outlined" fullWidth onClick={() => setVideoBlob(null)}>
+                    다시 촬영
+                  </Button>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    onClick={uploadVideo}
+                    disabled={isLoading}
+                    startIcon={isLoading ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                  >
+                    {isLoading ? '업로드 중...' : '업로드'}
+                  </Button>
+                </>
+              )}
+            </Stack>
+            <Button variant="text" onClick={() => { stopCamera(); setMode('select'); }}>
+              뒤로
+            </Button>
+          </Stack>
+        )}
+
+        {/* URL 직접 입력 화면 */}
+        {mode === 'url' && (
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="영상 URL"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              fullWidth
+              size="small"
+              placeholder="https://..."
+            />
+            <Stack direction="row" spacing={2}>
+              <Button variant="outlined" fullWidth onClick={() => setMode('select')}>
+                뒤로
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={saveVideoUrl}
+                disabled={isLoading || !videoUrl.trim()}
+                startIcon={isLoading ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+              >
+                {isLoading ? '저장 중...' : '저장'}
+              </Button>
+            </Stack>
+          </Stack>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onSkip} disabled={isLoading}>
+        <Button onClick={handleSkip} disabled={isLoading || isRecording}>
           건너뛰기
-        </Button>
-        <Button
-          variant="contained"
-          onClick={() => onSaveVideoUrl(videoUrl)}
-          disabled={isLoading || !videoUrl.trim()}
-          startIcon={isLoading && <CircularProgress size={16} color="inherit" />}
-        >
-          {isLoading ? '저장 중...' : '저장'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -958,9 +1206,10 @@ export default function ReceiptsPage() {
     open: false,
     receipt: null,
   });
-  const [videoDialog, setVideoDialog] = useState<{ open: boolean; receiptId: number | null }>({
+  const [videoDialog, setVideoDialog] = useState<{ open: boolean; receiptId: number | null; trackingNumber: string }>({
     open: false,
     receiptId: null,
+    trackingNumber: '',
   });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; receipt: UnmatchedReceiptDetail | null }>({
     open: false,
@@ -1002,16 +1251,18 @@ export default function ReceiptsPage() {
       return;
     }
 
+    const scannedTrackingNumber = trackingNumber.trim();
+
     try {
       const result = await quickScanMutation.mutateAsync({
-        trackingNumber: trackingNumber.trim(),
+        trackingNumber: scannedTrackingNumber,
       });
 
       showSnackbar(`수령 건이 생성되었습니다. (ID: ${result.receiptId})`, 'success');
       setTrackingNumber('');
 
       // 영상 녹화 다이얼로그 열기
-      setVideoDialog({ open: true, receiptId: result.receiptId });
+      setVideoDialog({ open: true, receiptId: result.receiptId, trackingNumber: scannedTrackingNumber });
 
       unmatchedQuery.refetch();
       trackingInputRef.current?.focus();
@@ -1020,20 +1271,24 @@ export default function ReceiptsPage() {
     }
   };
 
-  // 영상 URL 저장
-  const handleSaveVideoUrl = async (url: string) => {
-    if (!videoDialog.receiptId) return;
+  // 영상 다이얼로그 완료 후 내용물 입력 다이얼로그로 이동
+  const handleVideoComplete = () => {
+    const receiptId = videoDialog.receiptId;
+    const trackingNum = videoDialog.trackingNumber;
+    setVideoDialog({ open: false, receiptId: null, trackingNumber: '' });
+    unmatchedQuery.refetch();
 
-    try {
-      await updateVideoMutation.mutateAsync({
-        receiptId: videoDialog.receiptId,
-        requestData: { videoUrl: url },
+    // 내용물 입력 다이얼로그 열기
+    if (receiptId) {
+      setEditDialog({
+        open: true,
+        receipt: {
+          id: receiptId,
+          trackingNumber: trackingNum,
+          isMatched: false,
+          createdAt: new Date().toISOString(),
+        } as UnmatchedReceiptDetail,
       });
-      showSnackbar('영상 URL이 저장되었습니다.', 'success');
-      setVideoDialog({ open: false, receiptId: null });
-      unmatchedQuery.refetch();
-    } catch (error: any) {
-      showSnackbar(error?.message || '영상 URL 저장에 실패했습니다.', 'error');
     }
   };
 
@@ -1401,10 +1656,9 @@ export default function ReceiptsPage() {
       <VideoRecordDialog
         open={videoDialog.open}
         receiptId={videoDialog.receiptId}
-        onClose={() => setVideoDialog({ open: false, receiptId: null })}
-        onSkip={() => setVideoDialog({ open: false, receiptId: null })}
-        onSaveVideoUrl={handleSaveVideoUrl}
-        isLoading={updateVideoMutation.isPending}
+        trackingNumber={videoDialog.trackingNumber}
+        onClose={() => setVideoDialog({ open: false, receiptId: null, trackingNumber: '' })}
+        onComplete={handleVideoComplete}
       />
 
       {/* 삭제 확인 다이얼로그 */}
