@@ -16,6 +16,7 @@ export const getRequests = async (params?: {
   status?: PurchaseRequestStatus;
   userId?: number;
   eventId?: number;
+  hasNeedNegotiation?: boolean;
 }): Promise<AlbumPurchaseRequestSimple[]> => {
   const { data } = await requests({
     method: 'get',

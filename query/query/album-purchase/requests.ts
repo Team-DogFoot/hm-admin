@@ -18,6 +18,7 @@ export function useGetRequests(params?: {
   status?: PurchaseRequestStatus;
   userId?: number;
   eventId?: number;
+  hasNeedNegotiation?: boolean;
 }) {
   return useQuery({
     queryKey: ['album-purchase', 'requests', params],

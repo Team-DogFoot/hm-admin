@@ -20,6 +20,8 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import { useGetRequests } from '@/query/query/album-purchase/requests';
 import type { PurchaseRequestStatus } from '@/types/albumPurchase';
 import ListPageHeader from '../_components/ListPageHeader';
@@ -65,8 +67,12 @@ export default function RequestsPage() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<PurchaseRequestStatus | undefined>();
   const [searchText, setSearchText] = useState('');
+  const [hasNeedNegotiation, setHasNeedNegotiation] = useState(false);
 
-  const { data: requests = [], isLoading, refetch } = useGetRequests({ status: statusFilter });
+  const { data: requests = [], isLoading, refetch } = useGetRequests({
+    status: statusFilter,
+    hasNeedNegotiation: hasNeedNegotiation || undefined,
+  });
 
   // Filter by search
   const filteredRequests = useMemo(() => {
@@ -262,6 +268,17 @@ export default function RequestsPage() {
             <MenuItem value="PENDING_SETTLEMENT">정산대기</MenuItem>
             <MenuItem value="SETTLEMENT_COMPLETED">정산완료</MenuItem>
           </TextField>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={hasNeedNegotiation}
+                onChange={(e) => setHasNeedNegotiation(e.target.checked)}
+                color="warning"
+              />
+            }
+            label="조정필요 아이템 포함"
+            sx={{ ml: 1 }}
+          />
           <Box sx={{ flex: 1 }} />
           <Tooltip title="새로고침">
             <IconButton onClick={() => refetch()}>
