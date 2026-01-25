@@ -8,6 +8,7 @@ import {
   getDashboardStats,
   getSettlementReport,
   updateSettlementStatus,
+  deleteSettlement,
 } from '../../api/album-purchase/settlements';
 import type {
   CreateSettlementRequest,
@@ -128,6 +129,26 @@ export function useUpdateSettlementStatus() {
       });
       queryClient.invalidateQueries({
         queryKey: ['album-purchase', 'settlement', variables.settlementId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'dashboard-stats'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'requests'],
+      });
+    },
+  });
+}
+
+// 정산 삭제
+export function useDeleteSettlement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (settlementId: number) => deleteSettlement(settlementId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'settlements'],
       });
       queryClient.invalidateQueries({
         queryKey: ['album-purchase', 'dashboard-stats'],

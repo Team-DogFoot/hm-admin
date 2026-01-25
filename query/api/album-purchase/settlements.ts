@@ -194,3 +194,19 @@ export const updateSettlementStatus = async (
 
   return data as SettlementDetail;
 };
+
+// 정산 삭제
+export const deleteSettlement = async (settlementId: number): Promise<void> => {
+  const { data } = await requests({
+    method: 'delete',
+    url: `${BASE_URL}/${settlementId}`,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+};

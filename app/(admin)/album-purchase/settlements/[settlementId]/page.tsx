@@ -22,6 +22,7 @@ import {
   useGetSettlementDetail,
   useCompleteSettlement,
   useUpdateSettlementStatus,
+  useDeleteSettlement,
 } from '@/query/query/album-purchase/settlements';
 import { useSnackbar } from '../../_components/useSnackbar';
 import type { SettlementStatus } from '@/types/albumPurchase';
@@ -45,12 +46,14 @@ export default function SettlementDetailPage() {
   const { data: settlement, isLoading } = useGetSettlementDetail(settlementId);
   const completeMutation = useCompleteSettlement();
   const updateStatusMutation = useUpdateSettlementStatus();
+  const deleteMutation = useDeleteSettlement();
 
   const [transferredAt, setTransferredAt] = useState(
     new Date().toISOString().slice(0, 16),
   );
   const [settlementNote, setSettlementNote] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<SettlementStatus | ''>('');
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
 
   const handleComplete = async () => {
     if (confirm('정산을 완료 처리하시겠습니까?')) {
@@ -93,6 +96,30 @@ export default function SettlementDetailPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (deleteConfirmStep === 0) {
+      // 첫 번째 확인
+      if (confirm('정말로 이 정산을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) {
+        setDeleteConfirmStep(1);
+        showSnackbar('삭제를 진행하려면 삭제 버튼을 한 번 더 클릭하세요.', 'warning');
+      }
+    } else {
+      // 두 번째 확인
+      if (confirm('최종 확인: 정산을 삭제합니다.\n\n정말로 삭제하시겠습니까?')) {
+        try {
+          await deleteMutation.mutateAsync(settlementId);
+          showSnackbar('정산이 삭제되었습니다.', 'success');
+          setTimeout(() => router.push('/album-purchase/settlements'), 1000);
+        } catch (error: any) {
+          showSnackbar(error?.message || '삭제에 실패했습니다.', 'error');
+          setDeleteConfirmStep(0);
+        }
+      } else {
+        setDeleteConfirmStep(0);
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <Box
@@ -115,9 +142,24 @@ export default function SettlementDetailPage() {
   return (
     <Box sx={{ p: 3 }}>
       <SnackbarComponent />
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
-        정산 상세
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          정산 상세
+        </Typography>
+        <Button
+          variant="outlined"
+          color="error"
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+          startIcon={deleteMutation.isPending && <CircularProgress size={16} color="inherit" />}
+        >
+          {deleteMutation.isPending
+            ? '삭제 중...'
+            : deleteConfirmStep === 1
+              ? '삭제 확인 (한 번 더 클릭)'
+              : '정산 삭제'}
+        </Button>
+      </Box>
 
       {/* 관리자 액션 */}
       <Paper sx={{ p: 3, mb: 3, bgcolor: '#f5f5f5' }}>
