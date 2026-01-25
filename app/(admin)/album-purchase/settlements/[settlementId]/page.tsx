@@ -13,11 +13,28 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import Chip from '@mui/material/Chip';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
 import {
   useGetSettlementDetail,
   useCompleteSettlement,
+  useUpdateSettlementStatus,
 } from '@/query/query/album-purchase/settlements';
 import { useSnackbar } from '../../_components/useSnackbar';
+import type { SettlementStatus } from '@/types/albumPurchase';
+
+const settlementStatusLabel: Record<SettlementStatus, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
+  PENDING: { label: '대기', color: 'default' },
+  IN_PROGRESS: { label: '진행중', color: 'primary' },
+  COMPLETED: { label: '완료', color: 'success' },
+  CANCELLED: { label: '취소', color: 'error' },
+  HOLD: { label: '보류', color: 'warning' },
+};
+
+const allSettlementStatuses: SettlementStatus[] = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'HOLD'];
 
 export default function SettlementDetailPage() {
   const params = useParams();
@@ -27,11 +44,13 @@ export default function SettlementDetailPage() {
 
   const { data: settlement, isLoading } = useGetSettlementDetail(settlementId);
   const completeMutation = useCompleteSettlement();
+  const updateStatusMutation = useUpdateSettlementStatus();
 
   const [transferredAt, setTransferredAt] = useState(
     new Date().toISOString().slice(0, 16),
   );
   const [settlementNote, setSettlementNote] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<SettlementStatus | ''>('');
 
   const handleComplete = async () => {
     if (confirm('정산을 완료 처리하시겠습니까?')) {
@@ -47,6 +66,29 @@ export default function SettlementDetailPage() {
         setTimeout(() => router.push('/album-purchase/settlements'), 1500);
       } catch (error: any) {
         showSnackbar(error?.message || '정산 완료에 실패했습니다.', 'error');
+      }
+    }
+  };
+
+  const handleStatusChange = async () => {
+    if (!selectedStatus) {
+      showSnackbar('상태를 선택해주세요.', 'warning');
+      return;
+    }
+    const requiresTransferredAt = selectedStatus === 'COMPLETED' && !settlement?.transferredAt;
+    if (confirm(`정산 상태를 '${settlementStatusLabel[selectedStatus].label}'(으)로 변경하시겠습니까?${requiresTransferredAt ? '\n\n(입금일시가 현재 시간으로 설정됩니다)' : ''}`)) {
+      try {
+        await updateStatusMutation.mutateAsync({
+          settlementId,
+          requestData: {
+            status: selectedStatus,
+            ...(requiresTransferredAt && { transferredAt: new Date().toISOString() }),
+          },
+        });
+        showSnackbar('상태가 변경되었습니다.', 'success');
+        setSelectedStatus('');
+      } catch (error: any) {
+        showSnackbar(error?.message || '상태 변경에 실패했습니다.', 'error');
       }
     }
   };
@@ -76,6 +118,38 @@ export default function SettlementDetailPage() {
       <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
         정산 상세
       </Typography>
+
+      {/* 관리자 액션 */}
+      <Paper sx={{ p: 3, mb: 3, bgcolor: '#f5f5f5' }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
+          상태 변경
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>상태 변경</InputLabel>
+            <Select
+              value={selectedStatus}
+              label="상태 변경"
+              onChange={(e) => setSelectedStatus(e.target.value as SettlementStatus)}
+            >
+              {allSettlementStatuses.map((status) => (
+                <MenuItem key={status} value={status} disabled={status === settlement.status}>
+                  {settlementStatusLabel[status].label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            onClick={handleStatusChange}
+            disabled={!selectedStatus || updateStatusMutation.isPending}
+            startIcon={updateStatusMutation.isPending && <CircularProgress size={16} color="inherit" />}
+            sx={{ height: 40 }}
+          >
+            {updateStatusMutation.isPending ? '변경 중...' : '상태 변경'}
+          </Button>
+        </Box>
+      </Paper>
 
       {/* 정산 기본 정보 */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -109,9 +183,11 @@ export default function SettlementDetailPage() {
             <Typography variant="body2" color="text.secondary">
               상태
             </Typography>
-            <Typography variant="body1" fontWeight={500}>
-              {settlement.status}
-            </Typography>
+            <Chip
+              label={settlementStatusLabel[settlement.status as SettlementStatus]?.label || settlement.status}
+              color={settlementStatusLabel[settlement.status as SettlementStatus]?.color || 'default'}
+              size="small"
+            />
           </Box>
           <Box>
             <Typography variant="body2" color="text.secondary">

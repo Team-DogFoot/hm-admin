@@ -23,6 +23,9 @@ import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import EditIcon from '@mui/icons-material/Edit';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 import {
   useGetRequestDetail,
   useAcceptRequest,
@@ -30,9 +33,11 @@ import {
   useProposePrice,
   useDeleteRequest,
   useUpdateRequestItem,
+  useForceUpdateRequestStatus,
+  useFinishReviewAndCreateSettlement,
 } from '@/query/query/album-purchase/requests';
 import { useSnackbar } from '../../_components/useSnackbar';
-import type { RequestItem, PurchaseAvailableType, EventPurchaseType } from '@/types/albumPurchase';
+import type { RequestItem, PurchaseAvailableType, EventPurchaseType, PurchaseRequestStatus } from '@/types/albumPurchase';
 
 const purchaseAvailableTypeLabel: Record<string, { label: string; color: 'success' | 'warning' | 'error' }> = {
   AVAILABLE: { label: '매입가능', color: 'success' },
@@ -47,6 +52,34 @@ const eventPurchaseTypeLabel: Record<string, string> = {
   ETC: '기타',
 };
 
+const purchaseRequestStatusLabel: Record<PurchaseRequestStatus, string> = {
+  DRAFT: '임시저장',
+  NEED_NEGOTIATION: '가격조정필요',
+  SUBMITTED: '제출됨',
+  SHIPPED: '발송완료',
+  COMPLETE_TRACKING_NUMBER: '송장등록완료',
+  RECEIVED_AND_MATCHED: '입고및매칭완료',
+  REVIEWING: '검수중',
+  FINAL_NEGOTIATION: '최종협상',
+  FINISH_REVIEW: '검수완료',
+  PENDING_SETTLEMENT: '정산대기',
+  SETTLEMENT_COMPLETED: '정산완료',
+};
+
+const allPurchaseRequestStatuses: PurchaseRequestStatus[] = [
+  'DRAFT',
+  'NEED_NEGOTIATION',
+  'SUBMITTED',
+  'SHIPPED',
+  'COMPLETE_TRACKING_NUMBER',
+  'RECEIVED_AND_MATCHED',
+  'REVIEWING',
+  'FINAL_NEGOTIATION',
+  'FINISH_REVIEW',
+  'PENDING_SETTLEMENT',
+  'SETTLEMENT_COMPLETED',
+];
+
 export default function RequestDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -59,8 +92,11 @@ export default function RequestDetailPage() {
   const proposeMutation = useProposePrice();
   const deleteMutation = useDeleteRequest();
   const updateItemMutation = useUpdateRequestItem();
+  const forceStatusMutation = useForceUpdateRequestStatus();
+  const finishReviewMutation = useFinishReviewAndCreateSettlement();
 
   const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<PurchaseRequestStatus | ''>('');
   const [proposedPrice, setProposedPrice] = useState('');
   const [proposalNote, setProposalNote] = useState('');
 
@@ -178,6 +214,40 @@ export default function RequestDetailPage() {
 
   const canDelete = request && (request.status === 'DRAFT' || request.status === 'NEED_NEGOTIATION');
 
+  const handleForceStatusChange = async () => {
+    if (!selectedStatus) {
+      showSnackbar('상태를 선택해주세요.', 'warning');
+      return;
+    }
+    if (confirm(`상태를 '${purchaseRequestStatusLabel[selectedStatus]}'(으)로 변경하시겠습니까?`)) {
+      try {
+        await forceStatusMutation.mutateAsync({
+          requestId,
+          requestData: { status: selectedStatus },
+        });
+        showSnackbar('상태가 변경되었습니다.', 'success');
+        setSelectedStatus('');
+      } catch (error: any) {
+        showSnackbar(error?.message || '상태 변경에 실패했습니다.', 'error');
+      }
+    }
+  };
+
+  const handleFinishReview = async () => {
+    if (confirm('검수를 완료하고 정산 건을 생성하시겠습니까?\n\n이 작업 후에는 매입 신청 목록에서 보이지 않게 됩니다.')) {
+      try {
+        await finishReviewMutation.mutateAsync({
+          requestId,
+          processedBy: 'admin',
+        });
+        showSnackbar('검수완료 및 정산 건이 생성되었습니다.', 'success');
+        setTimeout(() => router.push('/album-purchase/requests'), 1000);
+      } catch (error: any) {
+        showSnackbar(error?.message || '검수완료 처리에 실패했습니다.', 'error');
+      }
+    }
+  };
+
   // 페이지네이션된 아이템
   const paginatedItems = useMemo(() => {
     if (!request?.items) return [];
@@ -233,6 +303,53 @@ export default function RequestDetailPage() {
         )}
       </Box>
 
+      {/* 관리자 액션 */}
+      <Paper sx={{ p: 3, mb: 3, bgcolor: '#f5f5f5' }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
+          관리자 액션
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* 상태 강제 변경 */}
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>상태 변경</InputLabel>
+            <Select
+              value={selectedStatus}
+              label="상태 변경"
+              onChange={(e) => setSelectedStatus(e.target.value as PurchaseRequestStatus)}
+            >
+              {allPurchaseRequestStatuses.map((status) => (
+                <MenuItem key={status} value={status} disabled={status === request.status}>
+                  {purchaseRequestStatusLabel[status]}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            onClick={handleForceStatusChange}
+            disabled={!selectedStatus || forceStatusMutation.isPending}
+            startIcon={forceStatusMutation.isPending && <CircularProgress size={16} color="inherit" />}
+            sx={{ height: 40 }}
+          >
+            {forceStatusMutation.isPending ? '변경 중...' : '상태 변경'}
+          </Button>
+
+          {/* 검수완료 버튼 - REVIEWING 상태일 때만 표시 */}
+          {request.status === 'REVIEWING' && (
+            <Button
+              variant="contained"
+              color="success"
+              onClick={handleFinishReview}
+              disabled={finishReviewMutation.isPending}
+              startIcon={finishReviewMutation.isPending && <CircularProgress size={16} color="inherit" />}
+              sx={{ height: 40, ml: 'auto' }}
+            >
+              {finishReviewMutation.isPending ? '처리 중...' : '검수완료 (정산 생성)'}
+            </Button>
+          )}
+        </Box>
+      </Paper>
+
       {/* 신청 정보 */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
@@ -257,9 +374,11 @@ export default function RequestDetailPage() {
             <Typography variant="body2" color="text.secondary">
               상태
             </Typography>
-            <Typography variant="body1" fontWeight={500}>
-              {request.status}
-            </Typography>
+            <Chip
+              label={purchaseRequestStatusLabel[request.status as PurchaseRequestStatus] || request.status}
+              size="small"
+              color="primary"
+            />
           </Box>
           <Box>
             <Typography variant="body2" color="text.secondary">

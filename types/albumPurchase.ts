@@ -410,6 +410,12 @@ export interface UpdateRequestItemDTO {
   note?: string;
 }
 
+export interface UpdateSettlementStatusRequest {
+  status: SettlementStatus;
+  settlementNote?: string;
+  transferredAt?: string;
+}
+
 // Dashboard Stats
 export interface DashboardStats {
   totalSettlementCount: number;

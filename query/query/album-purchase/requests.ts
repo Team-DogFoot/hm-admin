@@ -8,6 +8,8 @@ import {
   updateRequestStatus,
   deleteRequest,
   updateRequestItem,
+  forceUpdateRequestStatus,
+  finishReviewAndCreateSettlement,
 } from '../../api/album-purchase/requests';
 import type {
   PurchaseRequestStatus,
@@ -182,6 +184,62 @@ export function useUpdateRequestItem() {
           Array.isArray(query.queryKey) &&
           query.queryKey[0] === 'album-purchase' &&
           query.queryKey[1] === 'requests',
+      });
+    },
+  });
+}
+
+// 매입 신청 상태 강제 변경
+export function useForceUpdateRequestStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      requestData,
+    }: {
+      requestId: number;
+      requestData: UpdateStatusRequestDTO;
+    }) => forceUpdateRequestStatus(requestId, requestData),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'request', variables.requestId],
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'album-purchase' &&
+          query.queryKey[1] === 'requests',
+      });
+    },
+  });
+}
+
+// 검수완료 및 정산 생성
+export function useFinishReviewAndCreateSettlement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      requestId,
+      processedBy,
+    }: {
+      requestId: number;
+      processedBy?: string;
+    }) => finishReviewAndCreateSettlement(requestId, processedBy),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'request', variables.requestId],
+      });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'album-purchase' &&
+          query.queryKey[1] === 'requests',
+      });
+      // 정산 목록도 무효화
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'settlements'],
       });
     },
   });

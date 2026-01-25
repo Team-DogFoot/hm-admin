@@ -197,3 +197,47 @@ export const updateRequestItem = async (
 
   return data as RequestItem;
 };
+
+// 매입 신청 상태 강제 변경
+export const forceUpdateRequestStatus = async (
+  requestId: number,
+  requestData: UpdateStatusRequestDTO,
+): Promise<UpdateStatusResponseDTO> => {
+  const { data } = await requests({
+    method: 'patch',
+    url: `${BASE_URL}/${requestId}/force-status`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as UpdateStatusResponseDTO;
+};
+
+// 검수완료 및 정산 생성
+export const finishReviewAndCreateSettlement = async (
+  requestId: number,
+  processedBy: string = 'admin',
+): Promise<UpdateStatusResponseDTO> => {
+  const { data } = await requests({
+    method: 'post',
+    url: `${BASE_URL}/${requestId}/finish-review`,
+    params: { processedBy },
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as UpdateStatusResponseDTO;
+};

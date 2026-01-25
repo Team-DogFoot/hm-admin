@@ -6,6 +6,7 @@ import type {
   EligibleRequest,
   CreateSettlementRequest,
   CompleteSettlementRequest,
+  UpdateSettlementStatusRequest,
   SettlementStatus,
   DashboardStats,
   PeriodReport,
@@ -170,4 +171,26 @@ export const getSettlementReport = async (
   }
 
   return data as PeriodReport;
+};
+
+// 정산 상태 변경
+export const updateSettlementStatus = async (
+  settlementId: number,
+  requestData: UpdateSettlementStatusRequest,
+): Promise<SettlementDetail> => {
+  const { data } = await requests({
+    method: 'patch',
+    url: `${BASE_URL}/${settlementId}/status`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as SettlementDetail;
 };

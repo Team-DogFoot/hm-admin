@@ -7,11 +7,13 @@ import {
   completeSettlement,
   getDashboardStats,
   getSettlementReport,
+  updateSettlementStatus,
 } from '../../api/album-purchase/settlements';
 import type {
   CreateSettlementRequest,
   CompleteSettlementRequest,
   SettlementStatus,
+  UpdateSettlementStatusRequest,
 } from '@/types/albumPurchase';
 
 // 정산 대상 조회
@@ -105,5 +107,34 @@ export function useGetSettlementReport(startDate: string, endDate: string) {
     queryKey: ['album-purchase', 'settlement-report', startDate, endDate],
     queryFn: () => getSettlementReport(startDate, endDate),
     enabled: !!startDate && !!endDate,
+  });
+}
+
+// 정산 상태 변경
+export function useUpdateSettlementStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      settlementId,
+      requestData,
+    }: {
+      settlementId: number;
+      requestData: UpdateSettlementStatusRequest;
+    }) => updateSettlementStatus(settlementId, requestData),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'settlements'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'settlement', variables.settlementId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'dashboard-stats'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'requests'],
+      });
+    },
   });
 }
