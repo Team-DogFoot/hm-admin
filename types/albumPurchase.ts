@@ -349,7 +349,15 @@ export interface SettlementItem {
   albumArtist: string;
   entertainmentAgency: string;
   albumIsbn: string;
+  unitPrice: number;
   finalPrice: number;
+  quantity: number;
+  // 재고 이동 정보
+  transferredToLogiProductId?: number;
+  transferredToLogiProductTitle?: string;
+  transferredQuantity?: number;
+  stockTransferredAt?: string;
+  stockTransferNote?: string;
 }
 
 export interface CreateSettlementRequest {

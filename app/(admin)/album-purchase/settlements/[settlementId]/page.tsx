@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -18,14 +18,25 @@ import Select from '@mui/material/Select';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import {
   useGetSettlementDetail,
   useCompleteSettlement,
   useUpdateSettlementStatus,
   useDeleteSettlement,
+  useFindSimilarProducts,
+  useTransferStock,
 } from '@/query/query/album-purchase/settlements';
+import { SimilarLogiProduct } from '@/query/api/album-purchase/settlements';
 import { useSnackbar } from '../../_components/useSnackbar';
-import type { SettlementStatus } from '@/types/albumPurchase';
+import type { SettlementStatus, SettlementItem } from '@/types/albumPurchase';
 
 const settlementStatusLabel: Record<SettlementStatus, { label: string; color: 'default' | 'primary' | 'success' | 'warning' | 'error' }> = {
   PENDING: { label: '대기', color: 'default' },
@@ -54,6 +65,27 @@ export default function SettlementDetailPage() {
   const [settlementNote, setSettlementNote] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<SettlementStatus | ''>('');
   const [deleteConfirmStep, setDeleteConfirmStep] = useState(0);
+
+  // 재고 이동 상태
+  const [stockTransferDialogOpen, setStockTransferDialogOpen] = useState(false);
+  const [selectedItemForTransfer, setSelectedItemForTransfer] = useState<SettlementItem | null>(null);
+  const [selectedLogiProduct, setSelectedLogiProduct] = useState<SimilarLogiProduct | null>(null);
+  const [transferQuantity, setTransferQuantity] = useState<number>(0);
+  const [transferNote, setTransferNote] = useState('');
+
+  const transferStockMutation = useTransferStock();
+  const { data: similarProducts, isLoading: isLoadingSimilar } = useFindSimilarProducts(
+    settlementId,
+    selectedItemForTransfer?.id || 0,
+    stockTransferDialogOpen && !!selectedItemForTransfer
+  );
+
+  // 다이얼로그가 열릴 때 수량 초기화
+  useEffect(() => {
+    if (selectedItemForTransfer) {
+      setTransferQuantity(selectedItemForTransfer.quantity || 1);
+    }
+  }, [selectedItemForTransfer]);
 
   const handleComplete = async () => {
     if (confirm('정산을 완료 처리하시겠습니까?')) {
@@ -117,6 +149,73 @@ export default function SettlementDetailPage() {
       } else {
         setDeleteConfirmStep(0);
       }
+    }
+  };
+
+  // 재고 이동 다이얼로그 열기
+  const handleOpenStockTransferDialog = (item: SettlementItem) => {
+    setSelectedItemForTransfer(item);
+    setSelectedLogiProduct(null);
+    setTransferNote('');
+    setStockTransferDialogOpen(true);
+  };
+
+  // 재고 이동 다이얼로그 닫기
+  const handleCloseStockTransferDialog = () => {
+    setStockTransferDialogOpen(false);
+    setSelectedItemForTransfer(null);
+    setSelectedLogiProduct(null);
+    setTransferNote('');
+  };
+
+  // 재고 이동 실행
+  const handleTransferStock = async () => {
+    if (!selectedItemForTransfer || !selectedLogiProduct) {
+      showSnackbar('이동할 상품을 선택해주세요.', 'warning');
+      return;
+    }
+
+    if (transferQuantity <= 0) {
+      showSnackbar('이동할 수량을 입력해주세요.', 'warning');
+      return;
+    }
+
+    if (confirm(`'${selectedLogiProduct.title}'(으)로 ${transferQuantity}개를 이동하시겠습니까?`)) {
+      try {
+        const result = await transferStockMutation.mutateAsync({
+          settlementId,
+          itemId: selectedItemForTransfer.id,
+          requestData: {
+            logiProductId: selectedLogiProduct.id,
+            quantity: transferQuantity,
+            note: transferNote || undefined,
+          },
+        });
+        showSnackbar(result.message || '재고가 이동되었습니다.', 'success');
+        handleCloseStockTransferDialog();
+      } catch (error: any) {
+        showSnackbar(error?.message || '재고 이동에 실패했습니다.', 'error');
+      }
+    }
+  };
+
+  // 매치 타입 라벨
+  const getMatchTypeLabel = (matchType: string) => {
+    switch (matchType) {
+      case 'EXACT_BARCODE':
+        return { label: 'ISBN 일치', color: 'success' as const };
+      case 'TITLE_ARTIST_MATCH':
+        return { label: '제목+아티스트 일치', color: 'primary' as const };
+      case 'TITLE_MATCH':
+        return { label: '제목 일치', color: 'info' as const };
+      case 'ARTIST_MATCH':
+        return { label: '아티스트 일치', color: 'info' as const };
+      case 'TITLE_PARTIAL':
+        return { label: '제목 부분 일치', color: 'warning' as const };
+      case 'PARTIAL_MATCH':
+        return { label: '부분 일치', color: 'warning' as const };
+      default:
+        return { label: matchType, color: 'default' as const };
     }
   };
 
@@ -333,7 +432,11 @@ export default function SettlementDetailPage() {
               <TableCell>아티스트</TableCell>
               <TableCell>소속사</TableCell>
               <TableCell>ISBN</TableCell>
+              <TableCell align="right">수량</TableCell>
               <TableCell align="right">최종 가격</TableCell>
+              {settlement.status === 'COMPLETED' && (
+                <TableCell align="center">재고 이동</TableCell>
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -344,14 +447,36 @@ export default function SettlementDetailPage() {
                   <TableCell>{item.albumArtist}</TableCell>
                   <TableCell>{item.entertainmentAgency}</TableCell>
                   <TableCell>{item.albumIsbn}</TableCell>
+                  <TableCell align="right">{item.quantity || 1}</TableCell>
                   <TableCell align="right">
                     ₩{item.finalPrice.toLocaleString()}
                   </TableCell>
+                  {settlement.status === 'COMPLETED' && (
+                    <TableCell align="center">
+                      {item.transferredToLogiProductId ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
+                          <CheckCircleIcon color="success" sx={{ fontSize: 18 }} />
+                          <Typography variant="caption" color="success.main">
+                            이동 완료 ({item.transferredQuantity}개)
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<LocalShippingIcon />}
+                          onClick={() => handleOpenStockTransferDialog(item)}
+                        >
+                          재고 이동
+                        </Button>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={settlement.status === 'COMPLETED' ? 7 : 6} align="center">
                   <Typography variant="body2" color="text.secondary">
                     아이템이 없습니다.
                   </Typography>
@@ -445,6 +570,158 @@ export default function SettlementDetailPage() {
           </Box>
         </Paper>
       )}
+
+      {/* 재고 이동 다이얼로그 */}
+      <Dialog
+        open={stockTransferDialogOpen}
+        onClose={handleCloseStockTransferDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">재고 이동</Typography>
+          <IconButton onClick={handleCloseStockTransferDialog} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedItemForTransfer && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                이동할 아이템
+              </Typography>
+              <Paper sx={{ p: 2, bgcolor: '#f5f5f5' }}>
+                <Typography variant="body1" fontWeight={500}>
+                  {selectedItemForTransfer.albumTitle}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedItemForTransfer.albumArtist} | {selectedItemForTransfer.entertainmentAgency}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  ISBN: {selectedItemForTransfer.albumIsbn}
+                </Typography>
+                <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
+                  수량: {selectedItemForTransfer.quantity || 1}개
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            이동할 상품 선택
+          </Typography>
+
+          {isLoadingSimilar ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : similarProducts && similarProducts.length > 0 ? (
+            <Box sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox"></TableCell>
+                    <TableCell>상품명</TableCell>
+                    <TableCell>아티스트</TableCell>
+                    <TableCell>ISBN</TableCell>
+                    <TableCell align="right">현재 재고</TableCell>
+                    <TableCell>매칭 타입</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {similarProducts.map((product) => {
+                    const matchLabel = getMatchTypeLabel(product.matchType);
+                    return (
+                      <TableRow
+                        key={product.id}
+                        hover
+                        selected={selectedLogiProduct?.id === product.id}
+                        onClick={() => setSelectedLogiProduct(product)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell padding="checkbox">
+                          <input
+                            type="radio"
+                            checked={selectedLogiProduct?.id === product.id}
+                            onChange={() => setSelectedLogiProduct(product)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={selectedLogiProduct?.id === product.id ? 600 : 400}>
+                            {product.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{product.artist}</TableCell>
+                        <TableCell>{product.barcode}</TableCell>
+                        <TableCell align="right">{product.stock}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={matchLabel.label}
+                            color={matchLabel.color}
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Box>
+          ) : (
+            <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#fafafa', mb: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                유사한 상품을 찾을 수 없습니다.
+              </Typography>
+            </Paper>
+          )}
+
+          {selectedLogiProduct && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                선택된 상품
+              </Typography>
+              <Paper sx={{ p: 2, bgcolor: '#e3f2fd', mb: 2 }}>
+                <Typography variant="body1" fontWeight={500}>
+                  {selectedLogiProduct.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedLogiProduct.artist} | 현재 재고: {selectedLogiProduct.stock}개
+                </Typography>
+              </Paper>
+
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="이동 수량"
+                  type="number"
+                  value={transferQuantity}
+                  onChange={(e) => setTransferQuantity(Number(e.target.value))}
+                  inputProps={{ min: 1, max: selectedItemForTransfer?.quantity || 1 }}
+                  size="small"
+                  sx={{ width: 120 }}
+                />
+                <TextField
+                  label="메모 (선택)"
+                  value={transferNote}
+                  onChange={(e) => setTransferNote(e.target.value)}
+                  size="small"
+                  sx={{ flex: 1, minWidth: 200 }}
+                />
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseStockTransferDialog}>취소</Button>
+          <Button
+            variant="contained"
+            onClick={handleTransferStock}
+            disabled={!selectedLogiProduct || transferStockMutation.isPending}
+            startIcon={transferStockMutation.isPending && <CircularProgress size={16} color="inherit" />}
+          >
+            {transferStockMutation.isPending ? '처리 중...' : '재고 이동'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

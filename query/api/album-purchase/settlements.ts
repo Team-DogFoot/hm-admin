@@ -210,3 +210,74 @@ export const deleteSettlement = async (settlementId: number): Promise<void> => {
     throw new Error(errorMessage);
   }
 };
+
+// 유사 상품 검색
+export interface SimilarLogiProduct {
+  id: number;
+  title: string;
+  artist: string;
+  ent: string;
+  barcode: string;
+  stock: number;
+  price: number;
+  thumbNailUrl?: string;
+  matchType: 'EXACT_BARCODE' | 'TITLE_ARTIST_MATCH' | 'TITLE_MATCH' | 'ARTIST_MATCH' | 'TITLE_PARTIAL' | 'PARTIAL_MATCH';
+}
+
+export const findSimilarProducts = async (
+  settlementId: number,
+  itemId: number,
+): Promise<SimilarLogiProduct[]> => {
+  const { data } = await requests({
+    method: 'get',
+    url: `${BASE_URL}/${settlementId}/items/${itemId}/similar-products`,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as SimilarLogiProduct[];
+};
+
+// 재고 이동
+export interface StockTransferRequest {
+  logiProductId: number;
+  quantity: number;
+  note?: string;
+}
+
+export interface StockTransferResponse {
+  settlementItemId: number;
+  logiProductId: number;
+  logiProductTitle: string;
+  transferredQuantity: number;
+  newStock: number;
+  message: string;
+}
+
+export const transferStock = async (
+  settlementId: number,
+  itemId: number,
+  requestData: StockTransferRequest,
+): Promise<StockTransferResponse> => {
+  const { data } = await requests({
+    method: 'post',
+    url: `${BASE_URL}/${settlementId}/items/${itemId}/transfer-stock`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as StockTransferResponse;
+};

@@ -9,6 +9,9 @@ import {
   getSettlementReport,
   updateSettlementStatus,
   deleteSettlement,
+  findSimilarProducts,
+  transferStock,
+  StockTransferRequest,
 } from '../../api/album-purchase/settlements';
 import type {
   CreateSettlementRequest,
@@ -155,6 +158,37 @@ export function useDeleteSettlement() {
       });
       queryClient.invalidateQueries({
         queryKey: ['album-purchase', 'requests'],
+      });
+    },
+  });
+}
+
+// 유사 상품 검색
+export function useFindSimilarProducts(settlementId: number, itemId: number, enabled = false) {
+  return useQuery({
+    queryKey: ['album-purchase', 'settlement', settlementId, 'item', itemId, 'similar-products'],
+    queryFn: () => findSimilarProducts(settlementId, itemId),
+    enabled: enabled && !!settlementId && !!itemId,
+  });
+}
+
+// 재고 이동
+export function useTransferStock() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      settlementId,
+      itemId,
+      requestData,
+    }: {
+      settlementId: number;
+      itemId: number;
+      requestData: StockTransferRequest;
+    }) => transferStock(settlementId, itemId, requestData),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['album-purchase', 'settlement', variables.settlementId],
       });
     },
   });
