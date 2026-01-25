@@ -448,3 +448,35 @@ export interface MonthlyData {
   settlementCount: number;
   totalAmount: number;
 }
+
+// User Types
+export type AlbumPurchaseUserLevel = 'CUSTOMER' | 'VIP' | 'ADMIN';
+
+export interface AlbumPurchaseUserSimple {
+  id: number;
+  userEmail: string;
+  userName: string;
+  nickName?: string;
+  phoneNumber?: string;
+  userLevel?: AlbumPurchaseUserLevel;
+  createdAt: string;
+}
+
+export interface AlbumPurchaseUserDetail {
+  id: number;
+  userEmail: string;
+  userName: string;
+  nickName?: string;
+  phoneNumber?: string;
+  birthDate?: string;
+  address?: string;
+  addressDetail?: string;
+  zipcode?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountHolderName?: string;
+  userLevel?: AlbumPurchaseUserLevel;
+  createdAt: string;
+  purchaseRequests: AlbumPurchaseRequestSimple[];
+  settlements: SettlementSimple[];
+}

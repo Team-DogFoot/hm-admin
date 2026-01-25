@@ -49,6 +49,7 @@ export const menus = [
       { href: '/album-purchase/receipts', text: '수령 처리' },
       { href: '/album-purchase/settlements', text: '정산 관리' },
       { href: '/album-purchase/settlements/report', text: '정산 리포트' },
+      { href: '/album-purchase/users', text: '고객 정보' },
     ],
   },
   {
