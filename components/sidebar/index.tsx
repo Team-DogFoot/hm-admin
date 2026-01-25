@@ -302,7 +302,10 @@ function Sidebar() {
   const handleReceiptScan = async (barcode: string) => {
     setReceiptStep('processing');
     try {
-      const result = await quickScanReceipt({ trackingNumber: barcode });
+      const result = await quickScanReceipt({
+        trackingNumber: barcode,
+        receivedBy: userEmail || undefined,
+      });
       setScannedReceipt({
         id: result.receiptId,
         barcode: result.trackingNumber,

@@ -200,6 +200,7 @@ export interface TrackingNumberInfo {
 // Receipt DTOs
 export interface QuickScanRequest {
   trackingNumber: string;
+  receivedBy?: string; // 수령자 (로그인한 유저 이메일)
 }
 
 export interface QuickScanResponse {
