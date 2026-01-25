@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
@@ -23,6 +25,7 @@ import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import AddIcon from '@mui/icons-material/Add';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
   useGetSettlements,
   useGetEligibleRequests,
@@ -174,6 +177,55 @@ export default function SettlementsPage() {
     return { total, pending, completed, eligible };
   }, [settlements, eligibleRequests]);
 
+  // Excel 다운로드
+  const handleDownloadExcel = useCallback(() => {
+    if (filteredSettlements.length === 0) {
+      return;
+    }
+
+    const data = [
+      ['정산ID', '신청자', '이메일', '정산금액', '정산일', '상태', '은행', '계좌번호'],
+      ...filteredSettlements.map((s: any) => [
+        s.id,
+        s.userName,
+        s.userEmail,
+        s.finalAmount,
+        s.settlementDate,
+        statusLabels[s.status as SettlementStatus] || s.status,
+        s.bankName || '',
+        s.accountNumber || '',
+      ]),
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    // 컬럼 너비 설정
+    worksheet['!cols'] = [
+      { wch: 10 }, // 정산ID
+      { wch: 15 }, // 신청자
+      { wch: 25 }, // 이메일
+      { wch: 15 }, // 정산금액
+      { wch: 12 }, // 정산일
+      { wch: 12 }, // 상태
+      { wch: 15 }, // 은행
+      { wch: 20 }, // 계좌번호
+    ];
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, '정산목록');
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+    });
+    const excelFile = new Blob([excelBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8',
+    });
+
+    const fileName = `정산목록_${statusFilter ? statusLabels[statusFilter] : '전체'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    saveAs(excelFile, fileName);
+  }, [filteredSettlements, statusFilter]);
+
   const handleCreateSettlements = async () => {
     if (selectedRequestIds.length === 0) {
       showSnackbar('정산할 신청을 선택해주세요.', 'warning');
@@ -226,6 +278,28 @@ export default function SettlementsPage() {
       ),
     },
     {
+      field: 'bankName',
+      headerName: '은행',
+      width: 100,
+      headerAlign: 'center',
+      align: 'center',
+      renderCell: (params) => (
+        <Typography variant="body2">
+          {params.value || '-'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'accountNumber',
+      headerName: '계좌번호',
+      width: 150,
+      renderCell: (params) => (
+        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+          {params.value || '-'}
+        </Typography>
+      ),
+    },
+    {
       field: 'settlementDate',
       headerName: '정산일',
       width: 110,
@@ -271,6 +345,8 @@ export default function SettlementsPage() {
     userName: settlement.userName,
     userEmail: settlement.userEmail,
     finalAmount: settlement.finalAmount,
+    bankName: settlement.bankName,
+    accountNumber: settlement.accountNumber,
     settlementDate: settlement.settlementDate,
     status: settlement.status,
   }));
@@ -361,6 +437,16 @@ export default function SettlementsPage() {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadExcel}
+            disabled={filteredSettlements.length === 0}
+            sx={{ fontWeight: 600, borderRadius: 2 }}
+          >
+            엑셀 다운로드
+          </Button>
         </Box>
 
         {/* Data Grid */}

@@ -317,6 +317,8 @@ export interface SettlementSimple {
   settlementDate: string;
   finalAmount: number;
   status: SettlementStatus;
+  bankName: string;
+  accountNumber: string;
   createdAt: string;
 }
 
