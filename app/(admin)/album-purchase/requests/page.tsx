@@ -11,6 +11,8 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
+import Select from '@mui/material/Select';
+import CircularProgress from '@mui/material/CircularProgress';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -22,11 +24,12 @@ import WarningIcon from '@mui/icons-material/Warning';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
-import { useGetRequests } from '@/query/query/album-purchase/requests';
+import { useGetRequests, useUpdateRequestStatus } from '@/query/query/album-purchase/requests';
 import type { PurchaseRequestStatus } from '@/types/albumPurchase';
 import ListPageHeader from '../_components/ListPageHeader';
 import StatCard from '../_components/StatCard';
 import { dataGridStyles, dataGridLocaleText } from '../_components/dataGridStyles';
+import { useSnackbar } from '../_components/useSnackbar';
 
 const statusLabels: Record<PurchaseRequestStatus, string> = {
   DRAFT: '초안',
@@ -63,16 +66,69 @@ const getStatusColor = (status: PurchaseRequestStatus) => {
   }
 };
 
+// 상태 전이 규칙 (백엔드와 동일하게 유지)
+const getAllowedTransitions = (status: PurchaseRequestStatus): PurchaseRequestStatus[] => {
+  switch (status) {
+    case 'DRAFT':
+      return ['SUBMITTED', 'NEED_NEGOTIATION'];
+    case 'NEED_NEGOTIATION':
+      return ['SUBMITTED', 'FINAL_NEGOTIATION'];
+    case 'SUBMITTED':
+      return ['SHIPPED'];
+    case 'SHIPPED':
+      return ['COMPLETE_TRACKING_NUMBER'];
+    case 'COMPLETE_TRACKING_NUMBER':
+      return ['RECEIVED_AND_MATCHED'];
+    case 'RECEIVED_AND_MATCHED':
+      return ['REVIEWING'];
+    case 'REVIEWING':
+      return ['FINISH_REVIEW', 'FINAL_NEGOTIATION'];
+    case 'FINAL_NEGOTIATION':
+      return ['SUBMITTED', 'FINISH_REVIEW'];
+    case 'FINISH_REVIEW':
+      return ['PENDING_SETTLEMENT'];
+    case 'PENDING_SETTLEMENT':
+      return ['SETTLEMENT_COMPLETED'];
+    case 'SETTLEMENT_COMPLETED':
+      return [];
+    default:
+      return [];
+  }
+};
+
 export default function RequestsPage() {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<PurchaseRequestStatus | undefined>();
   const [searchText, setSearchText] = useState('');
   const [hasNeedNegotiation, setHasNeedNegotiation] = useState(false);
+  const [updatingRequestId, setUpdatingRequestId] = useState<number | null>(null);
+  const { showSnackbar, SnackbarComponent } = useSnackbar();
 
   const { data: requests = [], isLoading, refetch } = useGetRequests({
     status: statusFilter,
     hasNeedNegotiation: hasNeedNegotiation || undefined,
   });
+
+  const updateStatusMutation = useUpdateRequestStatus();
+
+  const handleStatusChange = async (requestId: number, newStatus: PurchaseRequestStatus) => {
+    if (!confirm(`상태를 '${statusLabels[newStatus]}'(으)로 변경하시겠습니까?`)) {
+      return;
+    }
+
+    setUpdatingRequestId(requestId);
+    try {
+      await updateStatusMutation.mutateAsync({
+        requestId,
+        requestData: { status: newStatus },
+      });
+      showSnackbar(`상태가 '${statusLabels[newStatus]}'(으)로 변경되었습니다.`, 'success');
+    } catch (error: any) {
+      showSnackbar(error?.message || '상태 변경에 실패했습니다.', 'error');
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
 
   // Filter by search
   const filteredRequests = useMemo(() => {
@@ -164,12 +220,57 @@ export default function RequestsPage() {
     {
       field: 'status',
       headerName: '상태',
-      width: 130,
+      width: 160,
       headerAlign: 'center',
       align: 'center',
       renderCell: (params) => {
         const status = params.value as PurchaseRequestStatus;
-        return <Chip label={statusLabels[status] || status} color={getStatusColor(status)} size="small" />;
+        const requestId = params.row.requestId;
+        const allowedTransitions = getAllowedTransitions(status);
+        const isUpdating = updatingRequestId === requestId;
+
+        if (allowedTransitions.length === 0) {
+          return <Chip label={statusLabels[status] || status} color={getStatusColor(status)} size="small" />;
+        }
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {isUpdating ? (
+              <CircularProgress size={20} />
+            ) : (
+              <Select
+                value={status}
+                size="small"
+                onChange={(e) => handleStatusChange(requestId, e.target.value as PurchaseRequestStatus)}
+                sx={{
+                  minWidth: 130,
+                  height: 32,
+                  '& .MuiSelect-select': {
+                    py: 0.5,
+                    fontSize: '0.8125rem',
+                  },
+                }}
+                renderValue={(value) => (
+                  <Chip
+                    label={statusLabels[value] || value}
+                    color={getStatusColor(value)}
+                    size="small"
+                    sx={{ height: 24 }}
+                  />
+                )}
+              >
+                <MenuItem value={status} disabled>
+                  {statusLabels[status]} (현재)
+                </MenuItem>
+                {allowedTransitions.map((nextStatus) => (
+                  <MenuItem key={nextStatus} value={nextStatus}>
+                    → {statusLabels[nextStatus]}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+          </Box>
+        );
       },
     },
     {
@@ -218,6 +319,7 @@ export default function RequestsPage() {
 
   return (
     <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: 'calc(100vh - 72px)' }}>
+      <SnackbarComponent />
       <ListPageHeader
         icon={<AssignmentIcon sx={{ fontSize: 18 }} />}
         title="매입 신청 관리"

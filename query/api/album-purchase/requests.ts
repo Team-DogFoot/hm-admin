@@ -7,6 +7,8 @@ import type {
   AcceptRequestDTO,
   RejectRequestDTO,
   ProposeRequestDTO,
+  UpdateStatusRequestDTO,
+  UpdateStatusResponseDTO,
 } from '@/types/albumPurchase';
 
 const BASE_URL = `${API_URL}/logi/album-purchase/admin/request`;
@@ -129,4 +131,26 @@ export const proposePrice = async (
   }
 
   return data;
+};
+
+// 상태 변경
+export const updateRequestStatus = async (
+  requestId: number,
+  requestData: UpdateStatusRequestDTO,
+): Promise<UpdateStatusResponseDTO> => {
+  const { data } = await requests({
+    method: 'patch',
+    url: `${BASE_URL}/${requestId}/status`,
+    data: requestData,
+  });
+
+  const { errorMessage, errorCode, customMessage } = data;
+
+  if (customMessage) {
+    throw new Error(customMessage);
+  } else if (errorMessage) {
+    throw new Error(errorMessage);
+  }
+
+  return data as UpdateStatusResponseDTO;
 };

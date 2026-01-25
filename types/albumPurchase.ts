@@ -363,6 +363,18 @@ export interface ProposeRequestDTO {
   proposedBy: string;
 }
 
+export interface UpdateStatusRequestDTO {
+  status: PurchaseRequestStatus;
+  note?: string;
+}
+
+export interface UpdateStatusResponseDTO {
+  requestId: number;
+  status: string;
+  message: string;
+  allowedTransitions?: PurchaseRequestStatus[];
+}
+
 // Dashboard Stats
 export interface DashboardStats {
   totalSettlementCount: number;
