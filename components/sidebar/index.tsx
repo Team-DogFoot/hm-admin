@@ -318,6 +318,10 @@ function Sidebar() {
 
   const startReceiptRecording = async () => {
     try {
+      // 바코드 스캐너가 카메라를 해제할 시간을 줌
+      setReceiptStep('recording');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       const constraints = {
         video: {
           facingMode: { exact: 'environment' },
@@ -337,7 +341,12 @@ function Sidebar() {
 
       if (receiptVideoRef.current) {
         receiptVideoRef.current.srcObject = stream;
-        receiptVideoRef.current.play();
+        // play()가 Promise를 반환하므로 await
+        try {
+          await receiptVideoRef.current.play();
+        } catch (playErr) {
+          console.warn('Video autoplay failed:', playErr);
+        }
         receiptVideoRef.current.setAttribute('playsinline', 'true');
         receiptVideoRef.current.setAttribute('webkit-playsinline', 'true');
       }
@@ -365,11 +374,11 @@ function Sidebar() {
 
       mediaRecorder.start(1000);
       setReceiptIsRecording(true);
-      setReceiptStep('recording');
       showSnackbar('녹화가 시작되었습니다', 'info');
     } catch (error) {
       console.error('Receipt recording error:', error);
       showSnackbar('카메라에 접근할 수 없습니다', 'error');
+      setReceiptStep('ask-video');
     }
   };
 
