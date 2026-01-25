@@ -381,7 +381,7 @@ export default function RequestDetailPage() {
               총 평가 금액
             </Typography>
             <Typography variant="body1" fontWeight={500}>
-              ₩{request.totalEvaluatedPrice?.toLocaleString() ?? 0}
+              ₩{totalSummary.price.toLocaleString()}
             </Typography>
           </Box>
           <Box>
@@ -389,7 +389,7 @@ export default function RequestDetailPage() {
               총 수량
             </Typography>
             <Typography variant="body1" fontWeight={500}>
-              {request.totalEvaluatedStock ?? 0}
+              {totalSummary.quantity}
             </Typography>
           </Box>
           <Box>
