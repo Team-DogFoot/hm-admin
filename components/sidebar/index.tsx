@@ -269,42 +269,69 @@ function Sidebar() {
   };
 
   const uploadRecording = async () => {
-    try {
-      if (!videoBlob) {
-        showSnackbar('업로드할 비디오가 없습니다', 'error');
-        return;
-      }
-
-      if (!shippingCode || shippingCode.trim() === '') {
-        showSnackbar('배송 코드를 입력해주세요', 'warning');
-        return;
-      }
-
-      // 파일 크기 표시
-      const fileSizeInBytes = videoBlob.size;
-      const fileSizeInMB = (fileSizeInBytes / (1024 * 1024)).toFixed(2);
-
-      showSnackbar(`${fileSizeInMB}MB 비디오 업로드 중...`, 'info');
-
-      // 1. S3 업로드를 위한 presigned URL 가져오기
-      const presignedData = await presignRes(shippingCode, videoBlob);
-
-      // 2. presigned URL로 직접 S3에 업로드
-      await uploadRes(presignedData, videoBlob);
-
-      // 3. 업로드 결과 등록
-      await registerRes(shippingCode, presignedData.uploadFileUrl);
-
-      showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
-      setOpenModal(false);
-      setShippingCode('');
-      setVideoBlob(null);
-    } catch (error) {
-      console.error('업로드 오류:', error);
-      showSnackbar(
-        '영상 업로드 중 오류가 발생했습니다' + JSON.stringify(error),
-      );
+    if (!videoBlob) {
+      showSnackbar('업로드할 비디오가 없습니다', 'error');
+      return;
     }
+
+    if (!shippingCode || shippingCode.trim() === '') {
+      showSnackbar('배송 코드를 입력해주세요', 'warning');
+      return;
+    }
+
+    const fileSizeInMB = (videoBlob.size / (1024 * 1024)).toFixed(2);
+    showSnackbar(`${fileSizeInMB}MB 비디오 업로드 중...`, 'info');
+
+    // 1. S3 업로드를 위한 presigned URL 가져오기
+    let presignedData;
+    try {
+      presignedData = await presignRes(shippingCode, videoBlob);
+      if (!presignedData?.presignedUrl) {
+        showSnackbar('업로드 URL을 가져오지 못했습니다. 배송 코드를 확인해주세요.', 'error');
+        return;
+      }
+    } catch (error: any) {
+      console.error('Presign 오류:', error);
+      const msg = error?.response?.data?.errorMessage || error?.response?.data?.customMessage;
+      showSnackbar(msg || '배송 정보를 찾을 수 없습니다. 배송 코드를 확인해주세요.', 'error');
+      return;
+    }
+
+    // 2. presigned URL로 직접 S3에 업로드
+    try {
+      await axios.put(presignedData.presignedUrl, videoBlob, {
+        headers: { 'Content-Type': videoBlob.type },
+        timeout: 600000, // 10분 타임아웃
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
+    } catch (error: any) {
+      console.error('S3 업로드 오류:', error);
+      if (error?.code === 'ECONNABORTED') {
+        showSnackbar('업로드 시간이 초과되었습니다. 영상 길이를 줄이거나 네트워크를 확인해주세요.', 'error');
+      } else if (error?.response?.status === 403) {
+        showSnackbar('업로드 권한이 만료되었습니다. 다시 시도해주세요.', 'error');
+      } else if (!navigator.onLine) {
+        showSnackbar('네트워크 연결을 확인해주세요.', 'error');
+      } else {
+        showSnackbar('영상 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+      }
+      return;
+    }
+
+    // 3. 업로드 결과 등록
+    try {
+      await registerRes(shippingCode, presignedData.uploadFileUrl);
+    } catch (error: any) {
+      console.error('등록 오류:', error);
+      showSnackbar('영상은 업로드되었으나 등록에 실패했습니다. 관리자에게 문의해주세요.', 'warning');
+      return;
+    }
+
+    showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
+    setOpenModal(false);
+    setShippingCode('');
+    setVideoBlob(null);
   };
 
   const handleClick = (text: string) => {
@@ -415,15 +442,27 @@ function Sidebar() {
 
     setReceiptStep('uploading');
     setUploadProgress(0);
+
+    const fileSizeInMB = (receiptVideoBlob.size / (1024 * 1024)).toFixed(2);
+    showSnackbar(`${fileSizeInMB}MB 비디오 업로드 시작...`, 'info');
+
+    const fileName = `receipt_${scannedReceipt.id}_${Date.now()}.webm`;
+    const fileType = receiptVideoBlob.type || 'video/webm';
+
+    // 1. Presigned URL 가져오기
+    let presignedData;
     try {
-      const fileSizeInMB = (receiptVideoBlob.size / (1024 * 1024)).toFixed(2);
-      showSnackbar(`${fileSizeInMB}MB 비디오 업로드 시작...`, 'info');
+      presignedData = await createReceiptPresignedUrl(scannedReceipt.id, fileName, fileType);
+    } catch (error: any) {
+      console.error('Presign error:', error);
+      showSnackbar(error?.message || '업로드 URL을 가져오지 못했습니다. 잠시 후 다시 시도해주세요.', 'error');
+      setReceiptStep('ask-video');
+      setUploadProgress(0);
+      return;
+    }
 
-      const fileName = `receipt_${scannedReceipt.id}_${Date.now()}.webm`;
-      const fileType = receiptVideoBlob.type || 'video/webm';
-      const presignedData = await createReceiptPresignedUrl(scannedReceipt.id, fileName, fileType);
-
-      // 진행률 표시 및 타임아웃 연장된 업로드
+    // 2. S3에 업로드
+    try {
       await axios.put(presignedData.presignedUrl, receiptVideoBlob, {
         headers: { 'Content-Type': fileType },
         timeout: 600000, // 10분 타임아웃
@@ -436,23 +475,35 @@ function Sidebar() {
           }
         },
       });
-
-      await updateReceiptVideoUrl(scannedReceipt.id, { videoUrl: presignedData.uploadFileUrl });
-
-      showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
-      setUploadProgress(100);
-      // 영상 업로드 후 내용물 입력 단계로 이동
-      initReceiptFormData();
-      setReceiptStep('input-details');
     } catch (error: any) {
-      console.error('Upload error:', error);
-      const errorMsg = error?.code === 'ECONNABORTED'
-        ? '업로드 시간이 초과되었습니다. 영상 길이를 줄여주세요.'
-        : error?.message || '업로드 중 오류가 발생했습니다';
+      console.error('S3 upload error:', error);
+      let errorMsg = '영상 업로드에 실패했습니다.';
+      if (error?.code === 'ECONNABORTED') {
+        errorMsg = '업로드 시간이 초과되었습니다. 영상 길이를 줄이거나 네트워크를 확인해주세요.';
+      } else if (error?.response?.status === 403) {
+        errorMsg = '업로드 권한이 만료되었습니다. 다시 시도해주세요.';
+      } else if (!navigator.onLine) {
+        errorMsg = '네트워크 연결을 확인해주세요.';
+      }
       showSnackbar(errorMsg, 'error');
       setReceiptStep('ask-video');
       setUploadProgress(0);
+      return;
     }
+
+    // 3. 영상 URL 저장
+    try {
+      await updateReceiptVideoUrl(scannedReceipt.id, { videoUrl: presignedData.uploadFileUrl });
+    } catch (error: any) {
+      console.error('Save video URL error:', error);
+      showSnackbar('영상은 업로드되었으나 저장에 실패했습니다. 내용물 입력 후 다시 시도해주세요.', 'warning');
+      // 업로드는 성공했으므로 다음 단계로 진행
+    }
+
+    showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
+    setUploadProgress(100);
+    initReceiptFormData();
+    setReceiptStep('input-details');
   };
 
   const resetReceiptModal = () => {

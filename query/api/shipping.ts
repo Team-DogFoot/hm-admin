@@ -171,21 +171,24 @@ export const presignRes = async (shippingCode: string, videoBlob: Blob) => {
     },
   );
 
-  console.log('presignedData:', data);
-  console.log('presignedUrl:', data.presignedUrl);
+  // 에러 응답 체크
+  if (data?.errorMessage || data?.errorCode) {
+    throw new Error(data.errorMessage || data.customMessage || '배송 정보를 찾을 수 없습니다.');
+  }
+
+  if (!data?.presignedUrl) {
+    throw new Error('업로드 URL을 가져오지 못했습니다.');
+  }
 
   return data;
 };
 
-// 2. presigned URL로 직접 S3에 업로드
+// 2. presigned URL로 직접 S3에 업로드 (더 이상 사용하지 않음 - sidebar에서 직접 axios 호출)
 export const uploadRes = async (presignedData: any, videoBlob: Blob) => {
-  // URL이 유효한지 확인
   if (!presignedData || !presignedData.presignedUrl) {
-    console.error('presignedUrl이 없습니다:', presignedData);
     throw new Error('유효하지 않은 presigned URL');
   }
 
-  // URL이 http:// 또는 https://로 시작하는지 확인
   const url = presignedData.presignedUrl;
   const validUrl =
     url.startsWith('http://') || url.startsWith('https://')
@@ -193,9 +196,10 @@ export const uploadRes = async (presignedData: any, videoBlob: Blob) => {
       : `https:${url.startsWith('//') ? url : `//${url}`}`;
 
   const { data } = await axios.put(validUrl, videoBlob, {
-    headers: {
-      'Content-Type': videoBlob.type,
-    },
+    headers: { 'Content-Type': videoBlob.type },
+    timeout: 600000, // 10분 타임아웃
+    maxContentLength: Infinity,
+    maxBodyLength: Infinity,
     withCredentials: false,
   });
 
@@ -207,23 +211,24 @@ export const registerRes = async (
   shippingCode: string,
   uploadFileUrl: string,
 ) => {
-  try {
-    const { data } = await requests(
-      `${API_URL}/logi/shipping-videos/by-barcode`,
-      {
-        method: 'post',
-        headers: { 'Content-Type': 'application/json' },
-        data: JSON.stringify({
-          barcodeForVideo: shippingCode,
-          videoUrl: uploadFileUrl,
-        }),
-      },
-    );
-    return data;
-  } catch (error) {
-    console.error('비디오 등록 실패:', error);
-    return alert('비디오 등록 실패');
+  const { data } = await requests(
+    `${API_URL}/logi/shipping-videos/by-barcode`,
+    {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        barcodeForVideo: shippingCode,
+        videoUrl: uploadFileUrl,
+      }),
+    },
+  );
+
+  // 에러 응답 체크
+  if (data?.errorMessage || data?.errorCode) {
+    throw new Error(data.errorMessage || data.customMessage || '영상 등록에 실패했습니다.');
   }
+
+  return data;
 };
 
 // 발송일 수정
