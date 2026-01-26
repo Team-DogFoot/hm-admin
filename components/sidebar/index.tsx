@@ -91,6 +91,7 @@ function Sidebar() {
   const [receiptIsRecording, setReceiptIsRecording] = React.useState(false);
   const [receiptFormData, setReceiptFormData] = React.useState<UpdateReceiptRequest>({});
   const [isReceiptSaving, setIsReceiptSaving] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState(0);
 
   // 디바이스 기능 감지
   React.useEffect(() => {
@@ -408,28 +409,44 @@ function Sidebar() {
     }
 
     setReceiptStep('uploading');
+    setUploadProgress(0);
     try {
       const fileSizeInMB = (receiptVideoBlob.size / (1024 * 1024)).toFixed(2);
-      showSnackbar(`${fileSizeInMB}MB 비디오 업로드 중...`, 'info');
+      showSnackbar(`${fileSizeInMB}MB 비디오 업로드 시작...`, 'info');
 
       const fileName = `receipt_${scannedReceipt.id}_${Date.now()}.webm`;
       const fileType = receiptVideoBlob.type || 'video/webm';
       const presignedData = await createReceiptPresignedUrl(scannedReceipt.id, fileName, fileType);
 
+      // 진행률 표시 및 타임아웃 연장된 업로드
       await axios.put(presignedData.presignedUrl, receiptVideoBlob, {
         headers: { 'Content-Type': fileType },
+        timeout: 600000, // 10분 타임아웃
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+          }
+        },
       });
 
       await updateReceiptVideoUrl(scannedReceipt.id, { videoUrl: presignedData.uploadFileUrl });
 
       showSnackbar('영상이 성공적으로 업로드되었습니다', 'success');
+      setUploadProgress(100);
       // 영상 업로드 후 내용물 입력 단계로 이동
       initReceiptFormData();
       setReceiptStep('input-details');
     } catch (error: any) {
       console.error('Upload error:', error);
-      showSnackbar(error?.message || '업로드 중 오류가 발생했습니다', 'error');
+      const errorMsg = error?.code === 'ECONNABORTED'
+        ? '업로드 시간이 초과되었습니다. 영상 길이를 줄여주세요.'
+        : error?.message || '업로드 중 오류가 발생했습니다';
+      showSnackbar(errorMsg, 'error');
       setReceiptStep('ask-video');
+      setUploadProgress(0);
     }
   };
 
@@ -1118,14 +1135,39 @@ function Sidebar() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 3,
+                    width: '100%',
+                    maxWidth: 400,
                   }}
                 >
-                  <CircularProgress size={80} />
+                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                    <CircularProgress
+                      variant="determinate"
+                      value={uploadProgress}
+                      size={100}
+                      thickness={4}
+                    />
+                    <Box
+                      sx={{
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        right: 0,
+                        position: 'absolute',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography variant="h5" component="div" fontWeight="bold">
+                        {uploadProgress}%
+                      </Typography>
+                    </Box>
+                  </Box>
                   <Typography variant="h5" textAlign="center" fontWeight="bold">
                     업로드 중...
                   </Typography>
                   <Typography variant="body1" textAlign="center" color="text.secondary">
-                    잠시만 기다려주세요
+                    {uploadProgress < 100 ? '영상을 업로드하고 있습니다' : '업로드 완료, 처리 중...'}
                   </Typography>
                 </Box>
               )}
