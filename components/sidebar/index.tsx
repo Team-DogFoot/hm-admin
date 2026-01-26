@@ -125,7 +125,7 @@ function Sidebar() {
 
   const startRecording = async () => {
     try {
-      // 후면 카메라 먼저 시도
+      // 후면 카메라 먼저 시도 (오디오 녹음 비활성화)
       const constraints = {
         video: {
           facingMode: { exact: 'environment' },
@@ -133,6 +133,7 @@ function Sidebar() {
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
+        audio: false,
       };
 
       let stream: MediaStream;
@@ -149,6 +150,7 @@ function Sidebar() {
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
+          audio: false,
         });
       }
 
@@ -336,12 +338,14 @@ function Sidebar() {
       setReceiptStep('recording');
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+      // 오디오 녹음 비활성화
       const constraints = {
         video: {
           facingMode: { exact: 'environment' },
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
+        audio: false,
       };
 
       let stream: MediaStream;
@@ -350,6 +354,7 @@ function Sidebar() {
       } catch (err) {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
         });
       }
 
