@@ -239,6 +239,7 @@ export interface UpdateReceiptRequest {
   receivedBy?: string;
   senderName?: string;
   deliveryDestination?: string;
+  albumTitle?: string;
   arrivedQuantity?: number;
   normalPurchaseCount?: number;
   damagedCount?: number;
@@ -276,6 +277,7 @@ export interface UnmatchedReceiptDetail {
   receivedBy?: string;
   senderName?: string;
   deliveryDestination?: string;
+  albumTitle?: string;
   arrivedQuantity?: number;
   normalPurchaseCount?: number;
   damagedCount?: number;

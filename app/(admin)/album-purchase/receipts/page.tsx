@@ -216,6 +216,7 @@ function UnmatchedReceiptsTable({
       },
       { field: 'senderName', headerName: '보낸사람', width: 90 },
       { field: 'deliveryDestination', headerName: '배송처', width: 100 },
+      { field: 'albumTitle', headerName: '앨범명', width: 150 },
       {
         field: 'arrivedQuantity',
         headerName: '도착수량',
@@ -426,6 +427,7 @@ function MobileUnmatchedReceiptsList({
                 )}
                 {receipt.senderName && <Chip size="small" label={receipt.senderName} variant="outlined" />}
                 {receipt.deliveryDestination && <Chip size="small" label={receipt.deliveryDestination} variant="outlined" />}
+                {receipt.albumTitle && <Chip size="small" label={receipt.albumTitle} color="info" variant="outlined" />}
               </Stack>
 
               {/* 수량 정보 */}
@@ -747,6 +749,7 @@ function EditReceiptDialog({
         receivedBy: receipt.receivedBy || undefined,
         senderName: receipt.senderName || undefined,
         deliveryDestination: receipt.deliveryDestination || undefined,
+        albumTitle: receipt.albumTitle || undefined,
         arrivedQuantity: receipt.arrivedQuantity ?? undefined,
         normalPurchaseCount: receipt.normalPurchaseCount ?? undefined,
         damagedCount: receipt.damagedCount ?? undefined,
@@ -807,6 +810,15 @@ function EditReceiptDialog({
               size="small"
             />
           </Stack>
+
+          <TextField
+            label="앨범명"
+            value={formData.albumTitle || ''}
+            onChange={(e) => handleChange('albumTitle', e.target.value || undefined)}
+            fullWidth
+            size="small"
+            placeholder="예: 뉴진스 2집"
+          />
 
           <TextField
             label="수령자"
