@@ -1272,6 +1272,7 @@ export default function ReceiptsPage() {
   const { userEmail } = useAuth();
   const [tabValue, setTabValue] = useState<'matched' | 'unmatched' | 'settled'>('unmatched');
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [receiptSearchKeyword, setReceiptSearchKeyword] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedUnmatchedId, setSelectedUnmatchedId] = useState<number | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
@@ -1314,6 +1315,39 @@ export default function ReceiptsPage() {
   const deleteMutation = useDeleteReceipt();
   const matchMutation = useMatchUnmatchedReceipt();
   const unmatchMutation = useUnmatchReceipt();
+
+  // Filtered data based on search keyword
+  const debouncedReceiptSearch = useDebouncedValue(receiptSearchKeyword.trim().toLowerCase(), 300);
+
+  const filteredMatchedReceipts = useMemo(() => {
+    if (!receiptsQuery.data) return [];
+    if (!debouncedReceiptSearch) return receiptsQuery.data;
+    return receiptsQuery.data.filter(
+      (r) =>
+        r.trackingNumber?.toLowerCase().includes(debouncedReceiptSearch) ||
+        r.senderName?.toLowerCase().includes(debouncedReceiptSearch)
+    );
+  }, [receiptsQuery.data, debouncedReceiptSearch]);
+
+  const filteredSettledReceipts = useMemo(() => {
+    if (!settledReceiptsQuery.data) return [];
+    if (!debouncedReceiptSearch) return settledReceiptsQuery.data;
+    return settledReceiptsQuery.data.filter(
+      (r) =>
+        r.trackingNumber?.toLowerCase().includes(debouncedReceiptSearch) ||
+        r.senderName?.toLowerCase().includes(debouncedReceiptSearch)
+    );
+  }, [settledReceiptsQuery.data, debouncedReceiptSearch]);
+
+  const filteredUnmatchedReceipts = useMemo(() => {
+    if (!unmatchedQuery.data) return [];
+    if (!debouncedReceiptSearch) return unmatchedQuery.data;
+    return unmatchedQuery.data.filter(
+      (r) =>
+        r.trackingNumber?.toLowerCase().includes(debouncedReceiptSearch) ||
+        r.senderName?.toLowerCase().includes(debouncedReceiptSearch)
+    );
+  }, [unmatchedQuery.data, debouncedReceiptSearch]);
 
   // Stats
   const stats = useMemo(() => {
@@ -1516,11 +1550,27 @@ export default function ReceiptsPage() {
 
       {/* 탭 */}
       <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-          <Tab label={`미매칭 수령 건 (${stats.unmatched})`} value="unmatched" />
-          <Tab label={`매칭된 수령 건 (${stats.matched})`} value="matched" />
-          <Tab label={`정산완료 수령 건 (${stats.settled})`} value="settled" />
-        </Tabs>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50', flexWrap: 'wrap', gap: 1 }}>
+          <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
+            <Tab label={`미매칭 수령 건 (${stats.unmatched})`} value="unmatched" />
+            <Tab label={`매칭된 수령 건 (${stats.matched})`} value="matched" />
+            <Tab label={`정산완료 수령 건 (${stats.settled})`} value="settled" />
+          </Tabs>
+          <TextField
+            placeholder="이름 / 송장번호 검색"
+            value={receiptSearchKeyword}
+            onChange={(e) => setReceiptSearchKeyword(e.target.value)}
+            size="small"
+            sx={{ width: { xs: '100%', sm: 220 }, mr: { xs: 1, sm: 2 }, ml: { xs: 1, sm: 0 }, mb: { xs: 1, sm: 0 } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
 
         {/* 미매칭 수령 건 + 매칭 기능 */}
         {tabValue === 'unmatched' && (
@@ -1547,7 +1597,7 @@ export default function ReceiptsPage() {
                       )}
                     </Stack>
                     <MobileUnmatchedReceiptsList
-                      receipts={unmatchedQuery.data || []}
+                      receipts={filteredUnmatchedReceipts}
                       isLoading={unmatchedQuery.isLoading}
                       selectedUnmatchedId={selectedUnmatchedId}
                       onSelectUnmatched={setSelectedUnmatchedId}
@@ -1620,7 +1670,7 @@ export default function ReceiptsPage() {
                     미매칭 수령 건
                   </Typography>
                   <UnmatchedReceiptsTable
-                    receipts={unmatchedQuery.data || []}
+                    receipts={filteredUnmatchedReceipts}
                     isLoading={unmatchedQuery.isLoading}
                     selectedUnmatchedId={selectedUnmatchedId}
                     onSelectUnmatched={setSelectedUnmatchedId}
@@ -1681,7 +1731,7 @@ export default function ReceiptsPage() {
         {tabValue === 'matched' && (
           <Box sx={{ p: 2 }}>
             <MatchedReceiptsTable
-              receipts={receiptsQuery.data || []}
+              receipts={filteredMatchedReceipts}
               isLoading={receiptsQuery.isLoading}
               onUnmatchRequest={handleRequestUnmatch}
             />
@@ -1692,7 +1742,7 @@ export default function ReceiptsPage() {
         {tabValue === 'settled' && (
           <Box sx={{ p: 2 }}>
             <MatchedReceiptsTable
-              receipts={settledReceiptsQuery.data || []}
+              receipts={filteredSettledReceipts}
               isLoading={settledReceiptsQuery.isLoading}
               showUnmatchButton={false}
               noRowsLabel="정산 완료된 수령 건이 없습니다"
