@@ -26,6 +26,8 @@ import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import Link from 'next/link';
 import {
   useGetSettlementDetail,
   useCompleteSettlement,
@@ -34,6 +36,7 @@ import {
   useFindSimilarProducts,
   useTransferStock,
 } from '@/query/query/album-purchase/settlements';
+import { useGetRequestDetail } from '@/query/query/album-purchase/requests';
 import { SimilarLogiProduct } from '@/query/api/album-purchase/settlements';
 import { useSnackbar } from '../../_components/useSnackbar';
 import type { SettlementStatus, SettlementItem } from '@/types/albumPurchase';
@@ -55,6 +58,9 @@ export default function SettlementDetailPage() {
   const { showSnackbar, SnackbarComponent } = useSnackbar();
 
   const { data: settlement, isLoading } = useGetSettlementDetail(settlementId);
+  const { data: requestDetail, isLoading: isLoadingRequest } = useGetRequestDetail(
+    settlement?.purchaseRequestId
+  );
   const completeMutation = useCompleteSettlement();
   const updateStatusMutation = useUpdateSettlementStatus();
   const deleteMutation = useDeleteSettlement();
@@ -418,6 +424,84 @@ export default function SettlementDetailPage() {
             </Typography>
           </Box>
         </Box>
+      </Paper>
+
+      {/* 수령/검수 정보 */}
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: 18, fontWeight: 600 }}>
+          수령/검수 정보
+        </Typography>
+        {isLoadingRequest ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : requestDetail?.shippings && requestDetail.shippings.length > 0 ? (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>송장번호</TableCell>
+                <TableCell>택배사</TableCell>
+                <TableCell>앨범명</TableCell>
+                <TableCell>보낸사람</TableCell>
+                <TableCell align="center">수량</TableCell>
+                <TableCell align="center">파손</TableCell>
+                <TableCell align="center">싸인앨범</TableCell>
+                <TableCell align="center">미공포</TableCell>
+                <TableCell align="center">포토카드</TableCell>
+                <TableCell>수령자</TableCell>
+                <TableCell align="center">영상</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {requestDetail.shippings.map((shipping) => (
+                <TableRow key={shipping.id}>
+                  <TableCell sx={{ fontFamily: 'monospace' }}>{shipping.trackingNumber}</TableCell>
+                  <TableCell>{shipping.shippingCompany || '-'}</TableCell>
+                  <TableCell>{shipping.albumTitle || '-'}</TableCell>
+                  <TableCell>{shipping.senderName || '-'}</TableCell>
+                  <TableCell align="center">{shipping.actualQuantity ?? '-'}</TableCell>
+                  <TableCell align="center">
+                    {shipping.damagedCount != null && shipping.damagedCount > 0 ? (
+                      <Chip size="small" label={shipping.damagedCount} color="error" />
+                    ) : (
+                      shipping.damagedCount ?? '-'
+                    )}
+                  </TableCell>
+                  <TableCell align="center">
+                    {shipping.hasSignedAlbum ? (
+                      <CheckCircleIcon color="warning" sx={{ fontSize: 18 }} />
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell align="center">
+                    {shipping.hasUnreleasedPhotocard ? (
+                      <CheckCircleIcon color="info" sx={{ fontSize: 18 }} />
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell align="center">{shipping.photocardCount ?? '-'}</TableCell>
+                  <TableCell>{shipping.receivedBy || '-'}</TableCell>
+                  <TableCell align="center">
+                    {shipping.videoUrl ? (
+                      <IconButton
+                        size="small"
+                        component={Link}
+                        href={shipping.videoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        color="primary"
+                      >
+                        <PlayCircleOutlineIcon fontSize="small" />
+                      </IconButton>
+                    ) : '-'}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
+            수령 정보가 없습니다.
+          </Typography>
+        )}
       </Paper>
 
       {/* 정산 아이템 */}

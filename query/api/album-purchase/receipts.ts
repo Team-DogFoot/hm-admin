@@ -154,6 +154,7 @@ export const scanReceipt = async (
 // 수령 건 목록 조회
 export const getReceipts = async (params?: {
   isReceived?: boolean;
+  isSettled?: boolean;
 }): Promise<ShippingInfo[]> => {
   const { data } = await requests({
     method: 'get',

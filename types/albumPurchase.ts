@@ -196,7 +196,8 @@ export interface RequestItem {
 }
 
 export interface ShippingInfo {
-  shippingId: number;
+  id: number;
+  shippingId?: number; // 호환성을 위한 alias
   trackingNumber: string;
   shippingCompany: string;
   actualQuantity: number;
@@ -206,9 +207,19 @@ export interface ShippingInfo {
   requestId?: number;
   memo?: string;
   matchedReceiptId?: number;
-  photocardCount?: number;
+  // 검수 정보 (UnmatchedReceipt에서 가져옴)
+  albumTitle?: string;
+  senderName?: string;
+  deliveryDestination?: string;
+  arrivedQuantity?: number;
+  normalPurchaseCount?: number;
+  damagedCount?: number;
   hasSignedAlbum?: boolean;
+  hasUnreleasedPhotocard?: boolean;
+  photocardCount?: number;
   videoUrl?: string;
+  // 정산 상태
+  isSettled?: boolean;
 }
 
 export interface TrackingNumberInfo {

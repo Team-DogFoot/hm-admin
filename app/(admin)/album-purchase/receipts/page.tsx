@@ -40,6 +40,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VideocamIcon from '@mui/icons-material/Videocam';
 import StopIcon from '@mui/icons-material/Stop';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import axios from 'axios';
 import { createReceiptPresignedUrl, updateReceiptVideoUrl } from '@/query/api/album-purchase/receipts';
 import {
@@ -100,33 +101,82 @@ function MatchedReceiptsTable({
   receipts,
   isLoading,
   onUnmatchRequest,
+  showUnmatchButton = true,
+  noRowsLabel = '매칭된 수령 건이 없습니다',
 }: {
   receipts: ShippingInfo[];
   isLoading: boolean;
-  onUnmatchRequest: (receipt: ShippingInfo) => void;
+  onUnmatchRequest?: (receipt: ShippingInfo) => void;
+  showUnmatchButton?: boolean;
+  noRowsLabel?: string;
 }) {
   const columns = useMemo<GridColDef[]>(
     () => [
-      { field: 'shippingId', headerName: 'ID', width: 70, headerAlign: 'center', align: 'center' },
-      { field: 'trackingNumber', headerName: '송장번호', flex: 1, minWidth: 150 },
-      { field: 'shippingCompany', headerName: '택배사', width: 100 },
-      { field: 'actualQuantity', headerName: '수량', width: 70, headerAlign: 'center', align: 'center' },
-      { field: 'requestId', headerName: '신청 ID', width: 90, headerAlign: 'center', align: 'center' },
+      { field: 'id', headerName: 'ID', width: 70, headerAlign: 'center', align: 'center' },
+      { field: 'trackingNumber', headerName: '송장번호', width: 140 },
+      { field: 'shippingCompany', headerName: '택배사', width: 90 },
+      { field: 'albumTitle', headerName: '앨범명', width: 150 },
+      { field: 'senderName', headerName: '보낸사람', width: 90 },
+      { field: 'actualQuantity', headerName: '수량', width: 60, headerAlign: 'center', align: 'center' },
+      {
+        field: 'damagedCount',
+        headerName: '파손',
+        width: 60,
+        headerAlign: 'center',
+        align: 'center',
+        renderCell: (params) =>
+          params.value != null && params.value > 0 ? (
+            <Chip size="small" label={params.value} color="error" />
+          ) : (
+            params.value ?? '-'
+          ),
+      },
+      {
+        field: 'hasSignedAlbum',
+        headerName: '싸인',
+        width: 60,
+        headerAlign: 'center',
+        align: 'center',
+        renderCell: (params) =>
+          params.value ? <CheckCircleIcon color="success" fontSize="small" /> : '-',
+      },
+      {
+        field: 'videoUrl',
+        headerName: '영상',
+        width: 60,
+        headerAlign: 'center',
+        align: 'center',
+        renderCell: (params) =>
+          params.value ? (
+            <IconButton
+              size="small"
+              href={params.value}
+              target="_blank"
+              rel="noopener noreferrer"
+              color="primary"
+            >
+              <PlayCircleOutlineIcon fontSize="small" />
+            </IconButton>
+          ) : (
+            '-'
+          ),
+      },
+      { field: 'requestId', headerName: '신청 ID', width: 80, headerAlign: 'center', align: 'center' },
       {
         field: 'receivedAt',
         headerName: '수령일',
-        width: 160,
+        width: 140,
         renderCell: (params) => (
           <Typography variant="body2" color="text.secondary">
             {formatDateTime(params.value)}
           </Typography>
         ),
       },
-      { field: 'receivedBy', headerName: '수령자', width: 100 },
+      { field: 'receivedBy', headerName: '수령자', width: 90 },
       {
         field: 'requestDetail',
         headerName: '신청 상세',
-        width: 100,
+        width: 90,
         renderCell: (params) => (
           <Button
             component={Link}
@@ -141,30 +191,34 @@ function MatchedReceiptsTable({
           </Button>
         ),
       },
-      {
-        field: 'actions',
-        headerName: '',
-        width: 100,
-        renderCell: (params) => {
-          const disabled = !params.row.matchedReceiptId;
-          return (
-            <Tooltip title={disabled ? '미매칭 수령 건과 연결되지 않은 송장입니다.' : '매칭 해제'}>
-              <span>
-                <Button variant="outlined" size="small" disabled={disabled} onClick={() => onUnmatchRequest(params.row)}>
-                  매칭 해제
-                </Button>
-              </span>
-            </Tooltip>
-          );
-        },
-      },
+      ...(showUnmatchButton
+        ? [
+            {
+              field: 'actions',
+              headerName: '',
+              width: 100,
+              renderCell: (params: any) => {
+                const disabled = !params.row.matchedReceiptId;
+                return (
+                  <Tooltip title={disabled ? '미매칭 수령 건과 연결되지 않은 송장입니다.' : '매칭 해제'}>
+                    <span>
+                      <Button variant="outlined" size="small" disabled={disabled} onClick={() => onUnmatchRequest?.(params.row)}>
+                        매칭 해제
+                      </Button>
+                    </span>
+                  </Tooltip>
+                );
+              },
+            },
+          ]
+        : []),
     ],
-    [onUnmatchRequest]
+    [onUnmatchRequest, showUnmatchButton]
   );
 
   return (
     <DataGrid
-      rows={(receipts || []).map((receipt) => ({ id: receipt.shippingId || receipt.requestId, ...receipt }))}
+      rows={(receipts || []).map((receipt) => ({ ...receipt }))}
       columns={columns}
       pageSizeOptions={[10, 20, 50]}
       initialState={{ pagination: { paginationModel: { page: 0, pageSize: 20 } } }}
@@ -172,7 +226,7 @@ function MatchedReceiptsTable({
       disableRowSelectionOnClick
       rowHeight={52}
       sx={dataGridStyles}
-      localeText={{ ...dataGridLocaleText, noRowsLabel: '매칭된 수령 건이 없습니다' }}
+      localeText={{ ...dataGridLocaleText, noRowsLabel }}
     />
   );
 }
@@ -1216,7 +1270,7 @@ export default function ReceiptsPage() {
   const isMobile = useIsMobile();
   const { showSnackbar, SnackbarComponent } = useSnackbar();
   const { userEmail } = useAuth();
-  const [tabValue, setTabValue] = useState<'matched' | 'unmatched'>('unmatched');
+  const [tabValue, setTabValue] = useState<'matched' | 'unmatched' | 'settled'>('unmatched');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedUnmatchedId, setSelectedUnmatchedId] = useState<number | null>(null);
@@ -1243,7 +1297,8 @@ export default function ReceiptsPage() {
 
   const trackingInputRef = useRef<HTMLInputElement>(null);
 
-  const receiptsQuery = useGetReceipts({ isReceived: true });
+  const receiptsQuery = useGetReceipts({ isReceived: true, isSettled: false });
+  const settledReceiptsQuery = useGetReceipts({ isReceived: true, isSettled: true });
   const unmatchedQuery = useGetUnmatchedReceipts({ isMatched: false });
   const { data: selectedRequestDetail, isFetching: isRequestDetailLoading, refetch: refetchRequestDetail } = useGetRequestDetail(
     selectedRequestId ?? undefined
@@ -1263,9 +1318,10 @@ export default function ReceiptsPage() {
   // Stats
   const stats = useMemo(() => {
     const matched = receiptsQuery.data?.length || 0;
+    const settled = settledReceiptsQuery.data?.length || 0;
     const unmatched = unmatchedQuery.data?.length || 0;
-    return { matched, unmatched, total: matched + unmatched };
-  }, [receiptsQuery.data, unmatchedQuery.data]);
+    return { matched, settled, unmatched, total: matched + settled + unmatched };
+  }, [receiptsQuery.data, settledReceiptsQuery.data, unmatchedQuery.data]);
 
   // 퀵스캔 핸들러
   const handleQuickScan = async (e: React.FormEvent) => {
@@ -1463,6 +1519,7 @@ export default function ReceiptsPage() {
         <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
           <Tab label={`미매칭 수령 건 (${stats.unmatched})`} value="unmatched" />
           <Tab label={`매칭된 수령 건 (${stats.matched})`} value="matched" />
+          <Tab label={`정산완료 수령 건 (${stats.settled})`} value="settled" />
         </Tabs>
 
         {/* 미매칭 수령 건 + 매칭 기능 */}
@@ -1627,6 +1684,18 @@ export default function ReceiptsPage() {
               receipts={receiptsQuery.data || []}
               isLoading={receiptsQuery.isLoading}
               onUnmatchRequest={handleRequestUnmatch}
+            />
+          </Box>
+        )}
+
+        {/* 정산완료 수령 건 */}
+        {tabValue === 'settled' && (
+          <Box sx={{ p: 2 }}>
+            <MatchedReceiptsTable
+              receipts={settledReceiptsQuery.data || []}
+              isLoading={settledReceiptsQuery.isLoading}
+              showUnmatchButton={false}
+              noRowsLabel="정산 완료된 수령 건이 없습니다"
             />
           </Box>
         )}

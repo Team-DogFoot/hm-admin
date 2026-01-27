@@ -107,9 +107,9 @@ export function useDeleteReceipt() {
 }
 
 // 수령 건 목록 조회
-export function useGetReceipts(params?: { isReceived?: boolean }) {
+export function useGetReceipts(params?: { isReceived?: boolean; isSettled?: boolean }) {
   return useQuery({
-    queryKey: ['album-purchase', 'receipts', params?.isReceived ?? null],
+    queryKey: ['album-purchase', 'receipts', params?.isReceived ?? null, params?.isSettled ?? null],
     queryFn: () => getReceipts(params),
   });
 }

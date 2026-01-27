@@ -702,7 +702,7 @@ export default function RequestDetailPage() {
             </TableHead>
             <TableBody>
               {request.shippings.map((shipping) => (
-                <TableRow key={shipping.shippingId}>
+                <TableRow key={shipping.id}>
                   <TableCell sx={{ fontFamily: 'monospace' }}>{shipping.trackingNumber}</TableCell>
                   <TableCell>{shipping.shippingCompany || '-'}</TableCell>
                   <TableCell>{shipping.actualQuantity ?? '-'}</TableCell>
