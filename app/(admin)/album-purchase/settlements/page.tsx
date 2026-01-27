@@ -127,17 +127,31 @@ function EligibleRequestsTable({
     bankAccountNumber: request.bankAccountNumber,
   }));
 
+  const selectionModel = useMemo(() => ({
+    type: 'include' as const,
+    ids: new Set(selectedRequestIds.map(id => id as any)),
+  }), [selectedRequestIds]);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <DataGrid
       rows={rows}
       columns={columns}
       pageSizeOptions={[10, 20, 50]}
       initialState={{ pagination: { paginationModel: { page: 0, pageSize: 10 } } }}
-      loading={isLoading}
       checkboxSelection
-      rowSelectionModel={selectedRequestIds as any}
-      onRowSelectionModelChange={(newSelection: any) => {
-        onSelectionChange(Array.from(newSelection) as number[]);
+      rowSelectionModel={selectionModel}
+      onRowSelectionModelChange={(newSelection) => {
+        if (newSelection.type === 'include') {
+          onSelectionChange(Array.from(newSelection.ids) as number[]);
+        }
       }}
       disableRowSelectionOnClick
       rowHeight={60}
