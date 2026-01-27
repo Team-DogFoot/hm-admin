@@ -25,6 +25,12 @@ export const getEligibleRequests = async (): Promise<EligibleRequest[]> => {
     return [];
   }
 
+  // 배열이면 정상 응답
+  if (Array.isArray(data)) {
+    return data as EligibleRequest[];
+  }
+
+  // 객체면 에러 응답 확인
   const { errorMessage, errorCode, customMessage } = data;
 
   if (customMessage) {
@@ -35,7 +41,7 @@ export const getEligibleRequests = async (): Promise<EligibleRequest[]> => {
     throw new Error(errorMessage);
   }
 
-  return data as EligibleRequest[];
+  return [];
 };
 
 // 정산 생성
@@ -78,6 +84,12 @@ export const getSettlements = async (params?: {
     return [];
   }
 
+  // 배열이면 정상 응답
+  if (Array.isArray(data)) {
+    return data as SettlementSimple[];
+  }
+
+  // 객체면 에러 응답 확인
   const { errorMessage, errorCode, customMessage } = data;
 
   if (customMessage) {
@@ -88,7 +100,7 @@ export const getSettlements = async (params?: {
     throw new Error(errorMessage);
   }
 
-  return data as SettlementSimple[];
+  return [];
 };
 
 // 정산 상세 조회
