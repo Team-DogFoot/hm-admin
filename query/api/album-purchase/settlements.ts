@@ -21,6 +21,10 @@ export const getEligibleRequests = async (): Promise<EligibleRequest[]> => {
     url: `${BASE_URL}/eligible`,
   });
 
+  if (!data) {
+    return [];
+  }
+
   const { errorMessage, errorCode, customMessage } = data;
 
   if (customMessage) {
@@ -70,6 +74,10 @@ export const getSettlements = async (params?: {
     params,
   });
 
+  if (!data) {
+    return [];
+  }
+
   const { errorMessage, errorCode, customMessage } = data;
 
   if (customMessage) {
@@ -91,6 +99,11 @@ export const getSettlementDetail = async (
     method: 'get',
     url: `${BASE_URL}/${settlementId}`,
   });
+
+  // data가 null인 경우 처리 (삭제된 정산 조회 시)
+  if (!data) {
+    throw new Error('정산을 찾을 수 없습니다.');
+  }
 
   const { errorMessage, errorCode, customMessage } = data;
 
