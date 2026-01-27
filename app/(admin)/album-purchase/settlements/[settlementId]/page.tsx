@@ -140,8 +140,8 @@ export default function SettlementDetailPage() {
       if (confirm('최종 확인: 정산을 삭제합니다.\n\n정말로 삭제하시겠습니까?')) {
         try {
           await deleteMutation.mutateAsync(settlementId);
-          showSnackbar('정산이 삭제되었습니다.', 'success');
-          setTimeout(() => router.push('/album-purchase/settlements'), 1000);
+          // 삭제 성공 시 즉시 리스트 페이지로 이동 (재조회 방지)
+          router.push('/album-purchase/settlements');
         } catch (error: any) {
           showSnackbar(error?.message || '삭제에 실패했습니다.', 'error');
           setDeleteConfirmStep(0);

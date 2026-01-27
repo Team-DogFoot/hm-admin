@@ -149,7 +149,11 @@ export function useDeleteSettlement() {
 
   return useMutation({
     mutationFn: (settlementId: number) => deleteSettlement(settlementId),
-    onSuccess: () => {
+    onSuccess: (_, settlementId) => {
+      // 삭제된 정산의 상세 쿼리는 invalidate하지 않고 제거 (재조회 방지)
+      queryClient.removeQueries({
+        queryKey: ['album-purchase', 'settlement', settlementId],
+      });
       queryClient.invalidateQueries({
         queryKey: ['album-purchase', 'settlements'],
       });
