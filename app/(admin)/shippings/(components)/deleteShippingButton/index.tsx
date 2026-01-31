@@ -13,6 +13,8 @@ export default function DeleteShippingButton({ info }: any) {
     }
   };
 
+  if (info.row.original.shippingStatus === '결제완료') return null;
+
   return (
     <Button
       color="error"
