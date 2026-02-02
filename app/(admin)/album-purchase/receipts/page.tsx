@@ -1325,7 +1325,8 @@ export default function ReceiptsPage() {
     return receiptsQuery.data.filter(
       (r) =>
         r.trackingNumber?.toLowerCase().includes(debouncedReceiptSearch) ||
-        r.senderName?.toLowerCase().includes(debouncedReceiptSearch)
+        r.senderName?.toLowerCase().includes(debouncedReceiptSearch) ||
+        r.albumTitle?.toLowerCase().includes(debouncedReceiptSearch)
     );
   }, [receiptsQuery.data, debouncedReceiptSearch]);
 
@@ -1335,7 +1336,8 @@ export default function ReceiptsPage() {
     return settledReceiptsQuery.data.filter(
       (r) =>
         r.trackingNumber?.toLowerCase().includes(debouncedReceiptSearch) ||
-        r.senderName?.toLowerCase().includes(debouncedReceiptSearch)
+        r.senderName?.toLowerCase().includes(debouncedReceiptSearch) ||
+        r.albumTitle?.toLowerCase().includes(debouncedReceiptSearch)
     );
   }, [settledReceiptsQuery.data, debouncedReceiptSearch]);
 
@@ -1345,7 +1347,8 @@ export default function ReceiptsPage() {
     return unmatchedQuery.data.filter(
       (r) =>
         r.trackingNumber?.toLowerCase().includes(debouncedReceiptSearch) ||
-        r.senderName?.toLowerCase().includes(debouncedReceiptSearch)
+        r.senderName?.toLowerCase().includes(debouncedReceiptSearch) ||
+        r.albumTitle?.toLowerCase().includes(debouncedReceiptSearch)
     );
   }, [unmatchedQuery.data, debouncedReceiptSearch]);
 
@@ -1557,7 +1560,7 @@ export default function ReceiptsPage() {
             <Tab label={`정산완료 수령 건 (${stats.settled})`} value="settled" />
           </Tabs>
           <TextField
-            placeholder="이름 / 송장번호 검색"
+            placeholder="이름 / 송장번호 / 앨범명 검색"
             value={receiptSearchKeyword}
             onChange={(e) => setReceiptSearchKeyword(e.target.value)}
             size="small"
