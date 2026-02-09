@@ -208,18 +208,8 @@ export default function SettlementDetailPage() {
   // 매치 타입 라벨
   const getMatchTypeLabel = (matchType: string) => {
     switch (matchType) {
-      case 'EXACT_BARCODE':
-        return { label: 'ISBN 일치', color: 'success' as const };
-      case 'TITLE_ARTIST_MATCH':
-        return { label: '제목+아티스트 일치', color: 'primary' as const };
-      case 'TITLE_MATCH':
-        return { label: '제목 일치', color: 'info' as const };
-      case 'ARTIST_MATCH':
-        return { label: '아티스트 일치', color: 'info' as const };
-      case 'TITLE_PARTIAL':
-        return { label: '제목 부분 일치', color: 'warning' as const };
-      case 'PARTIAL_MATCH':
-        return { label: '부분 일치', color: 'warning' as const };
+      case 'EXACT_SKU':
+        return { label: 'SKU 일치', color: 'success' as const };
       default:
         return { label: matchType, color: 'default' as const };
     }

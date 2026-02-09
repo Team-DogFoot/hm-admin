@@ -246,7 +246,7 @@ export interface SimilarLogiProduct {
   stock: number;
   price: number;
   thumbNailUrl?: string;
-  matchType: 'EXACT_BARCODE' | 'TITLE_ARTIST_MATCH' | 'TITLE_MATCH' | 'ARTIST_MATCH' | 'TITLE_PARTIAL' | 'PARTIAL_MATCH';
+  matchType: 'EXACT_SKU';
 }
 
 export const findSimilarProducts = async (
