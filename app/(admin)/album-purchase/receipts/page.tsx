@@ -9,7 +9,6 @@ import TextField from '@mui/material/TextField';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
-import Radio from '@mui/material/Radio';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
@@ -567,7 +566,7 @@ function MatchDialog({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const debouncedKeyword = useDebouncedValue(searchKeyword.trim(), 400);
-  const { data: searchResults, isLoading: isSearching } = useSearchRequests(debouncedKeyword);
+  const { data: searchResults, isLoading: isSearching } = useSearchRequests(debouncedKeyword || undefined);
   const { data: requestDetail, isFetching: isRequestDetailLoading } = useGetRequestDetail(
     selectedRequestId ?? undefined
   );
@@ -637,48 +636,47 @@ function MatchDialog({
             }}
           />
 
-          {/* Search results as cards */}
-          {isSearching && (
+          {/* Search results */}
+          {!debouncedKeyword && (
+            <Typography variant="body2" color="text.secondary" sx={{ py: 1, textAlign: 'center' }}>
+              신청자 이름이나 이메일을 입력해주세요.
+            </Typography>
+          )}
+
+          {debouncedKeyword && isSearching && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
               <CircularProgress size={24} />
             </Box>
           )}
 
-          {!isSearching && searchResults && searchResults.length === 0 && debouncedKeyword && (
+          {debouncedKeyword && !isSearching && searchResults && searchResults.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ py: 1, textAlign: 'center' }}>
               검색 결과가 없습니다.
             </Typography>
           )}
 
-          {!isSearching && searchResults && searchResults.length > 0 && (
-            <Stack spacing={1} sx={{ maxHeight: 240, overflowY: 'auto' }}>
+          {debouncedKeyword && !isSearching && searchResults && searchResults.length > 0 && (
+            <Stack spacing={1} sx={{ maxHeight: 300, overflowY: 'auto' }}>
               {searchResults.map((request: any) => (
-                <Card
+                <Paper
                   key={request.requestId}
-                  elevation={0}
+                  variant="outlined"
                   sx={{
-                    border: '1px solid',
-                    borderColor: selectedRequestId === request.requestId ? 'primary.main' : 'divider',
-                    borderRadius: 1,
+                    p: 1.5,
                     cursor: 'pointer',
+                    borderColor: selectedRequestId === request.requestId ? 'primary.main' : 'divider',
                     bgcolor: selectedRequestId === request.requestId ? 'action.selected' : 'background.paper',
+                    '&:hover': { bgcolor: 'action.hover' },
                   }}
                   onClick={() => setSelectedRequestId(selectedRequestId === request.requestId ? null : request.requestId)}
                 >
-                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Radio checked={selectedRequestId === request.requestId} size="small" />
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          #{request.requestId} {request.userName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          {request.userEmail}
-                        </Typography>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
+                  <Typography variant="body2" fontWeight={600}>
+                    #{request.requestId} {request.userName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {request.userEmail}
+                  </Typography>
+                </Paper>
               ))}
             </Stack>
           )}
